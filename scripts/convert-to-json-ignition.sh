@@ -1,7 +1,10 @@
 #!/bin/bash
+set -x
 
 # load env variables from .env file
+set -a
 source .env
+env
 
 envsubst < server-1-ignite-boot.yaml > server-1-ignite-boot.yaml.tmp
 envsubst < server-2-ignite-boot.yaml > server-2-ignite-boot.yaml.tmp
