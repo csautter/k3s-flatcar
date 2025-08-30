@@ -39,7 +39,7 @@ storage:
       filesystem: root
       mode: 0644
       contents:
-        inline: server-2
+        inline: server-3
     - path: /opt/k3s-install.sh
       filesystem: root
       mode: 0755

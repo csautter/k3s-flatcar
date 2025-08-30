@@ -7,7 +7,7 @@ version: 1.0.0
 systemd:
   units:
     - name: k3s-install.service
-      enabled: true 
+      enabled: true
       contents: |
         [Unit]
         Description=Run K3s script
@@ -24,7 +24,7 @@ systemd:
         Environment="INSTALL_K3S_EXEC=--cluster-init"
         ExecStart=/usr/bin/sh -c "/opt/k3s-install.sh"
         [Install]
-        WantedBy=multi-user.target        
+        WantedBy=multi-user.target
 passwd:
   users:
     - name: core
@@ -35,12 +35,12 @@ storage:
   files:
     - path: /etc/hostname
       filesystem: root
-      mode: 0644      
+      mode: 0644
       contents:
-        inline: node-1  
+        inline: node-1
     - path: /opt/k3s-install.sh
       filesystem: root
-      mode: 777
+      mode: 0755
       contents:
         remote:
           url: https://get.k3s.io

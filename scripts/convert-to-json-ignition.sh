@@ -6,6 +6,9 @@ set -a
 source .env
 env
 
+# generate ignition config files for n servers
+# using the template files and the environment variables
+
 envsubst < server-1-ignite-boot.yaml > server-1-ignite-boot.yaml.tmp
 envsubst < server-2-ignite-boot.yaml > server-2-ignite-boot.yaml.tmp
 
