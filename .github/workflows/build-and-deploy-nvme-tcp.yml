@@ -1,0 +1,49 @@
+name: Build and Deploy NVMe-TCP Kernel Module
+
+on:
+  push:
+    branches: [main, feat/*]
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Run docker-nvme-tcp.sh
+        run: |
+          chmod +x sysext/docker-nvme-tcp.sh
+          ./sysext/docker-nvme-tcp.sh
+
+      - name: Find built nvme-tcp.ko.xz
+        id: find_nvme
+        run: |
+          find . -name nvme-tcp.ko.xz > nvme-tcp-path.txt
+          NVME_PATH=$(head -n 1 nvme-tcp-path.txt)
+          echo "nvme_path=$NVME_PATH" >> $GITHUB_OUTPUT
+
+      - name: Get version information
+        id: version
+        run: |
+          VERSION=$(date +"%Y%m%d")-$(git rev-parse --short HEAD)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Upload nvme-tcp.ko.xz as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nvme-tcp-ko-xz-${{ steps.version.outputs.version }}
+          path: ${{ steps.find_nvme.outputs.nvme_path }}
+
+      - name: Create release and upload package
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: nvme-tcp-${{ steps.version.outputs.version }}
+          name: NVMe-TCP Kernel Module ${{ steps.version.outputs.version }}
+          files: ${{ steps.find_nvme.outputs.nvme_path }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
