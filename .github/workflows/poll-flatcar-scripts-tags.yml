@@ -23,7 +23,17 @@ jobs:
       - name: Fetch all release tags from this repo
         id: get_own_releases
         run: |
-          curl -s "https://api.github.com/repos/${{ github.repository }}/releases?per_page=100" | jq -r '.[].tag_name' | sed -E 's/^.*?-.*?-.*?-//' > own_releases.txt
+          page=1
+          > own_releases.txt
+          while :; do
+            releases=$(curl -s "https://api.github.com/repos/${{ github.repository }}/releases?per_page=100&page=$page")
+            count=$(echo "$releases" | jq 'length')
+            if [ "$count" -eq 0 ]; then
+              break
+            fi
+            echo "$releases" | jq -r '.[].tag_name' | sed -E 's/^.*?-.*?-.*?-//' >> own_releases.txt
+            page=$((page + 1))
+          done
           echo "OWN_RELEASES=$(cat own_releases.txt | paste -sd "," -)" >> $GITHUB_ENV
 
       - name: Find new releases to build
