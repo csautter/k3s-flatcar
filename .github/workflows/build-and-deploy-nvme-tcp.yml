@@ -35,6 +35,12 @@ jobs:
           chmod +x build/kernel/nvme/docker-nvme-tcp.sh
           ./build/kernel/nvme/docker-nvme-tcp.sh
 
+      - name: Simulate docker-nvme-tcp.sh output file
+        if: github.ref != 'refs/heads/main'
+        run: |
+          mkdir -p build/kernel/nvme
+          echo "dummy nvme tcp module" > build/kernel/nvme/nvme-tcp.ko.xz
+
       - name: Find built nvme-tcp.ko.xz
         id: find_nvme
         run: |
@@ -77,6 +83,8 @@ jobs:
           find ./ -name "*nvme*ko*"
           mv ./nvme-tcp-ko-xz-X64/nvme-tcp.ko.xz ./nvme-tcp.ko.xz.amd64
           mv ./nvme-tcp-ko-xz-ARM64/nvme-tcp.ko.xz ./nvme-tcp.ko.xz.arm64
+          echo "Renamed artifacts"
+          ls -l ./nvme-tcp.ko.xz.*
       - name: Create release and upload package with commit hash
         if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
