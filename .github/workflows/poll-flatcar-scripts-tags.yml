@@ -14,10 +14,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Download processed tags list (if exists)
+      - name: Download processed releases list (if exists)
         uses: actions/download-artifact@v4
         with:
-          name: processed-flatcar-scripts-tags
+          name: processed-flatcar-scripts-releases
         continue-on-error: true
 
       - name: Fetch last 10 release versions from flatcar/scripts
