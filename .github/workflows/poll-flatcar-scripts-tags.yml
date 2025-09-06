@@ -1,8 +1,10 @@
-name: Poll flatcar/scripts Last 10 Tags
+name: Poll flatcar/scripts last 10 release tags
 
 on:
   schedule:
     - cron: "0 * * * *" # Runs every hour
+  push:
+    branches: [main, feat/*]
   workflow_dispatch:
 
 jobs:
@@ -40,16 +42,15 @@ jobs:
           comm -23 <(sort latest_releases.txt) <(sort processed_releases.txt 2>/dev/null) > new_releases.txt || true
           echo "NEW_RELEASES=$(cat new_releases.txt | paste -sd "," -)" >> $GITHUB_ENV
 
-      - name: Process new releases
+      - name: Trigger downstream workflow for each new release
         if: env.NEW_RELEASES != ''
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "New releases to process: $NEW_RELEASES"
-          # Loop through each new release and run your build/deploy logic
-          while IFS= read -r release; do
-            echo "Processing release: $release"
-            # Place your build/deploy commands here, e.g.:
-            # ./your-script.sh "$release"
-          done < new_releases.txt
+          grep '^stable-' new_releases.txt | while IFS= read -r release; do
+            echo "Triggering workflow for release: $release"
+            gh workflow run build-and-deploy-nvme-tcp.yml --ref main -f VERSION="$release"
+          done
 
       - name: Update processed releases list
         if: env.NEW_RELEASES != ''
