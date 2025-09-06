@@ -4,12 +4,17 @@ on:
   push:
     branches: [main, feat/*]
   workflow_dispatch:
+    inputs:
+      version:
+        description: "Kernel module version"
+        required: true
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
     env:
-      VERSION: stable-4230.2.2
+      VERSION: ${{ github.event.inputs.version || 'stable-4230.2.2' }}
+
     permissions:
       contents: write
       packages: write
