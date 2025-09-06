@@ -4,3 +4,5 @@
 **/*.tmp
 **/*.iso
 .idea
+kernel-modules/
+*.bin
