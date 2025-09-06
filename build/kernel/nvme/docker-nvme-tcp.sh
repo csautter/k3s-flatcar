@@ -10,8 +10,8 @@ echo "Major version: $VERSION_MAJOR -> reduced for container image tag"
 CONTAINER_NAME=ghcr.io/flatcar/flatcar-sdk-all:$VERSION_MAJOR.0.0
 
 docker pull $CONTAINER_NAME
-mkdir -p ./kernel-modules
-cat <<'EOF' | docker run -i --privileged -v /dev:/dev -v ./kernel-modules:/opt/kernel-modules/ $CONTAINER_NAME bash
+mkdir -p ./deployments/kernel/nvme/modules
+cat <<'EOF' | docker run -i --privileged -v /dev:/dev -v ./deployments/kernel/nvme/modules:/opt/kernel-modules/ $CONTAINER_NAME bash
 cd ~/trunk/src/scripts
 yes "" | ../sdk_init_selfcontained.sh
 git checkout stable-4230.2.2
