@@ -12,15 +12,16 @@ on:
         description: "Kernel module version"
         required: true
 
-jobs:
-  build-and-deploy:
-    runs-on: ubuntu-latest
-    env:
-      VERSION: ${{ inputs.version || 'stable-4230.2.2' }}
+env:
+  VERSION: ${{ inputs.version || 'stable-4230.2.2' }}
 
-    permissions:
-      contents: write
-      packages: write
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-24.04, ubuntu-24.04-arm]
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -33,6 +34,12 @@ jobs:
         run: |
           chmod +x build/kernel/nvme/docker-nvme-tcp.sh
           ./build/kernel/nvme/docker-nvme-tcp.sh
+
+      - name: Simulate docker-nvme-tcp.sh output file
+        if: github.ref != 'refs/heads/main'
+        run: |
+          mkdir -p build/kernel/nvme
+          echo "dummy nvme tcp module" > build/kernel/nvme/nvme-tcp.ko.xz
 
       - name: Find built nvme-tcp.ko.xz
         id: find_nvme
@@ -48,28 +55,56 @@ jobs:
           echo "git_revision=$GIT_REVISION" >> $GITHUB_OUTPUT
 
       - name: Upload nvme-tcp.ko.xz as artifact
-        if: github.ref == 'refs/heads/main'
         uses: actions/upload-artifact@v4
         with:
-          name: nvme-tcp-ko-xz-${{ steps.git_revision.outputs.git_revision }}
+          name: nvme-tcp-ko-xz-${{ runner.arch }}
           path: ${{ steps.find_nvme.outputs.nvme_path }}
 
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Get git revision information
+        id: git_revision
+        run: |
+          GIT_REVISION=$(date +"%Y%m%d")-$(git rev-parse --short HEAD)
+          echo "git_revision=$GIT_REVISION" >> $GITHUB_OUTPUT
+      - name: Download nvme-tcp.ko.xz artifact
+        uses: actions/download-artifact@v4
+        with:
+          pattern: nvme-tcp-ko-xz-*
+      - name: list built artifacts and rename
+        run: |
+          find ./ -name "*nvme*ko*"
+          mv ./nvme-tcp-ko-xz-X64/nvme-tcp.ko.xz ./nvme-tcp.ko.xz.amd64
+          mv ./nvme-tcp-ko-xz-ARM64/nvme-tcp.ko.xz ./nvme-tcp.ko.xz.arm64
+          echo "Renamed artifacts"
+          ls -l ./nvme-tcp.ko.xz.*
       - name: Create release and upload package with commit hash
-        if: github.ref == 'refs/heads/main'
+        if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: nvme-tcp-amd64-${{ env.VERSION }}-${{ steps.git_revision.outputs.git_revision }}
+          tag_name: nvme-tcp-${{ env.VERSION }}-${{ steps.git_revision.outputs.git_revision }}
           name: NVMe-TCP Kernel Module ${{ env.VERSION }}-${{ steps.git_revision.outputs.git_revision }}
-          files: ${{ steps.find_nvme.outputs.nvme_path }}
+          files: |
+            nvme-tcp.ko.xz.amd64
+            nvme-tcp.ko.xz.arm64
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create release and upload package with version tag
-        if: github.ref == 'refs/heads/main'
+        if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: nvme-tcp-amd64-${{ env.VERSION }}
+          tag_name: nvme-tcp-${{ env.VERSION }}
           name: NVMe-TCP Kernel Module ${{ env.VERSION }}
-          files: ${{ steps.find_nvme.outputs.nvme_path }}
+          files: |
+            nvme-tcp.ko.xz.amd64
+            nvme-tcp.ko.xz.arm64
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
