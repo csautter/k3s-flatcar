@@ -10,6 +10,9 @@ jobs:
     runs-on: ubuntu-latest
     env:
       VERSION: 4230.2.2
+    permissions:
+      contents: write
+      packages: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -19,8 +22,8 @@ jobs:
 
       - name: Run docker-nvme-tcp.sh
         run: |
-          chmod +x sysext/docker-nvme-tcp.sh
-          ./sysext/docker-nvme-tcp.sh
+          chmod +x build/kernel/nvme/docker-nvme-tcp.sh
+          ./build/kernel/nvme/docker-nvme-tcp.sh
 
       - name: Find built nvme-tcp.ko.xz
         id: find_nvme
@@ -41,11 +44,22 @@ jobs:
           name: nvme-tcp-ko-xz-${{ steps.git_revision.outputs.git_revision }}
           path: ${{ steps.find_nvme.outputs.nvme_path }}
 
-      - name: Create release and upload package
+      - name: Create release and upload package with commit hash
+        if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: nvme-tcp-amd64-${{ env.VERSION }}-${{ steps.git_revision.outputs.git_revision }}
           name: NVMe-TCP Kernel Module ${{ env.VERSION }}-${{ steps.git_revision.outputs.git_revision }}
+          files: ${{ steps.find_nvme.outputs.nvme_path }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create release and upload package with version tag
+        if: github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: nvme-tcp-amd64-${{ env.VERSION }}
+          name: NVMe-TCP Kernel Module ${{ env.VERSION }}
           files: ${{ steps.find_nvme.outputs.nvme_path }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
