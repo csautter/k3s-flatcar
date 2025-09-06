@@ -8,6 +8,8 @@ on:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+    env:
+      VERSION: 4230.2.2
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -27,23 +29,23 @@ jobs:
           NVME_PATH=$(head -n 1 nvme-tcp-path.txt)
           echo "nvme_path=$NVME_PATH" >> $GITHUB_OUTPUT
 
-      - name: Get version information
-        id: version
+      - name: Get git revision information
+        id: git_revision
         run: |
-          VERSION=$(date +"%Y%m%d")-$(git rev-parse --short HEAD)
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          GIT_REVISION=$(date +"%Y%m%d")-$(git rev-parse --short HEAD)
+          echo "git_revision=$GIT_REVISION" >> $GITHUB_OUTPUT
 
       - name: Upload nvme-tcp.ko.xz as artifact
         uses: actions/upload-artifact@v4
         with:
-          name: nvme-tcp-ko-xz-${{ steps.version.outputs.version }}
+          name: nvme-tcp-ko-xz-${{ steps.git_revision.outputs.git_revision }}
           path: ${{ steps.find_nvme.outputs.nvme_path }}
 
       - name: Create release and upload package
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: nvme-tcp-${{ steps.version.outputs.version }}
-          name: NVMe-TCP Kernel Module ${{ steps.version.outputs.version }}
+          tag_name: nvme-tcp-amd64-${{ env.VERSION }}-${{ steps.git_revision.outputs.git_revision }}
+          name: NVMe-TCP Kernel Module ${{ env.VERSION }}-${{ steps.git_revision.outputs.git_revision }}
           files: ${{ steps.find_nvme.outputs.nvme_path }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
