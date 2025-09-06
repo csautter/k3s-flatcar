@@ -47,7 +47,7 @@ jobs:
         run: |
           grep '^stable-' new_releases.txt | while IFS= read -r release; do
             echo "Triggering workflow for release: $release"
-            GITHUB_TOKEN=${{ secrets.GH_TOKEN }} gh workflow run build-and-deploy-nvme-tcp.yml --ref main -f version="$release"
+            GITHUB_TOKEN=${{ secrets.GH_TOKEN }} gh workflow run build-and-deploy-nvme-tcp.yml --ref ${{ github.ref }} -f version="$release"
           done
       - name: Update processed releases list
         if: env.NEW_RELEASES != ''

@@ -13,7 +13,7 @@ jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
     env:
-      VERSION: ${{ github.event.inputs.version || 'stable-4230.2.2' }}
+      VERSION: ${{ inputs.version || 'stable-4230.2.2' }}
 
     permissions:
       contents: write
