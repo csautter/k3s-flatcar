@@ -44,14 +44,11 @@ jobs:
 
       - name: Trigger downstream workflow for each new release
         if: env.NEW_RELEASES != ''
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           grep '^stable-' new_releases.txt | while IFS= read -r release; do
             echo "Triggering workflow for release: $release"
-            gh workflow run build-and-deploy-nvme-tcp.yml --ref main -f VERSION="$release"
+            GITHUB_TOKEN=${{ secrets.GH_TOKEN }} gh workflow run build-and-deploy-nvme-tcp.yml --ref main -f VERSION="$release"
           done
-
       - name: Update processed releases list
         if: env.NEW_RELEASES != ''
         run: |
