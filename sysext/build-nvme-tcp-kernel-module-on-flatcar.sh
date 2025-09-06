@@ -34,15 +34,27 @@ cat <<'INNERSCRIPT' | systemd-nspawn --bind=/usr/lib/modules --capability=CAP_NE
   make -C /usr/src/linux olddefconfig
   echo "CONFIG_NVME_TCP=m" >> /usr/src/linux/.config
   echo "CONFIG_NVME_TARGET_TCP=m" >> /usr/src/linux/.config
+  echo "CONFIG_NVME_CORE=m" >> /usr/src/linux/.config
+  echo "CONFIG_BLK_DEV_NVME=m" >> /usr/src/linux/.config
   grep NVME_TCP /usr/src/linux/.config
   grep NVME_TARGET_TCP /usr/src/linux/.config
-  read -p "Press enter to continue"
+  # read -p "Press enter to continue"
   make -C /usr/src/linux modules_prepare
   # make -C /usr/src/linux modules
-  cd /usr/src/linux/drivers/nvme/host
-  make -C /usr/src/linux M=$(pwd) modules
+  # Build and install nvme-tcp.ko (host)
+  #cd /usr/src/linux/drivers/nvme/host
+  #make -C /usr/src/linux M=$(pwd) modules
+  cd /usr/src/linux
+  make -j$(nproc)
+  make M=drivers/nvme/host
   mkdir -p /usr/lib/modules/$(uname -r)/extra
   cp -v nvme-tcp.ko /usr/lib/modules/$(uname -r)/extra/
+
+  # Build and install nvmet-tcp.ko (target)
+  cd /usr/src/linux/drivers/nvme/target
+  make -C /usr/src/linux M=$(pwd) modules
+  cp -v nvmet-tcp.ko /usr/lib/modules/$(uname -r)/extra/
+
   depmod -a
 INNERSCRIPT
 
