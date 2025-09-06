@@ -17,10 +17,21 @@ yes "" | ../sdk_init_selfcontained.sh
 git checkout $VERSION
 echo "CONFIG_NVME_TARGET_TCP=m" >> ~/trunk/src/third_party/coreos-overlay/sys-kernel/coreos-modules/files/commonconfig-*
 echo "CONFIG_NVME_TCP=m" >> ~/trunk/src/third_party/coreos-overlay/sys-kernel/coreos-modules/files/commonconfig-*
-./build_packages
-./build_image
-sudo find /build/amd64-usr/ -name "*nvme*ko*"
-sudo cp -r /build/amd64-usr/usr/lib/modules/*-flatcar/kernel/drivers/nvme/ /opt/kernel-modules/
+
+# consider architecture
+if [ "$(uname -m)" = "aarch64" ]; then
+  ./build_packages --board=arm64
+  ./build_image --board=arm64
+  ARCHITECTURE=arm64
+else
+  ./build_packages
+  ./build_image
+  ARCHITECTURE=amd64
+fi
+
+sudo find /build/ -name "*nvme*ko*"
+mkdir -p /opt/kernel-modules/${ARCHITECTURE:-amd64}
+sudo cp -r /build/*-usr/usr/lib/modules/*-flatcar/kernel/drivers/nvme/ /opt/kernel-modules/${ARCHITECTURE:-amd64}/
 EOF
 container_id=$(docker ps -l -q)
 echo "Container ID: $container_id"

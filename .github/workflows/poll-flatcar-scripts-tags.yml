@@ -31,7 +31,7 @@ jobs:
             if [ "$count" -eq 0 ]; then
               break
             fi
-            echo "$releases" | jq -r '.[].tag_name' | sed -E 's/^.*-(stable|lts)//' >> own_releases.txt
+            echo "$releases" | jq -r '.[].tag_name' | sed -E 's/^.*-(stable|lts)(-.*)/\1\2/' >> own_releases.txt
             page=$((page + 1))
           done
           echo "OWN_RELEASES=$(cat own_releases.txt | paste -sd "," -)" >> $GITHUB_ENV
@@ -43,6 +43,7 @@ jobs:
           new_releases=$(cat new_releases.txt | paste -sd "," -)
           echo "NEW_RELEASES=$new_releases" >> $GITHUB_ENV
           echo "new_releases=$new_releases" >> $GITHUB_OUTPUT
+          echo "NEW_RELEASES=$new_releases"
 
       - name: Trigger downstream workflow for each new release
         if: steps.find_new.outputs.new_releases != ''
