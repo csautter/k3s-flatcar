@@ -3,6 +3,9 @@ name: Build and Deploy NVMe-TCP Kernel Module
 on:
   push:
     branches: [main, feat/*]
+    paths:
+      - "build/kernel/nvme/docker-nvme-tcp.sh"
+      - ".github/workflows/build-and-deploy-nvme-tcp.yml"
   workflow_dispatch:
     inputs:
       version:
