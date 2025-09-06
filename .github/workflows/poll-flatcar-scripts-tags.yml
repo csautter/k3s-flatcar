@@ -14,52 +14,30 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Download processed releases list (if exists)
-        uses: actions/download-artifact@v4
-        with:
-          name: processed-flatcar-scripts-releases
-        continue-on-error: true
-
       - name: Fetch last 10 release versions from flatcar/scripts
         id: get_releases
         run: |
           curl -s "https://api.github.com/repos/flatcar/scripts/releases?per_page=10" | jq -r '.[].tag_name' > latest_releases.txt
           echo "LATEST_RELEASES=$(cat latest_releases.txt | paste -sd "," -)" >> $GITHUB_ENV
 
-      - name: Read processed releases list
-        id: read_processed
+      - name: Fetch all release tags from this repo
+        id: get_own_releases
         run: |
-          if [ -f processed_releases.txt ]; then
-            cat processed_releases.txt
-            echo "PROCESSED_RELEASES=$(cat processed_releases.txt | paste -sd "," -)" >> $GITHUB_ENV
-          else
-            echo "PROCESSED_RELEASES=" >> $GITHUB_ENV
-          fi
+          curl -s "https://api.github.com/repos/${{ github.repository }}/releases?per_page=100" | jq -r '.[].tag_name' | sed -E 's/^.*?-.*?-.*?-//' > own_releases.txt
+          echo "OWN_RELEASES=$(cat own_releases.txt | paste -sd "," -)" >> $GITHUB_ENV
 
-      - name: Find new releases to process
+      - name: Find new releases to build
         id: find_new
         run: |
-          comm -23 <(sort latest_releases.txt) <(sort processed_releases.txt 2>/dev/null) > new_releases.txt || true
-          echo "NEW_RELEASES=$(cat new_releases.txt | paste -sd "," -)" >> $GITHUB_ENV
+          comm -23 <(sort latest_releases.txt) <(sort own_releases.txt) > new_releases.txt || true
+          new_releases=$(cat new_releases.txt | paste -sd "," -)
+          echo "NEW_RELEASES=$new_releases" >> $GITHUB_ENV
+          echo "new_releases=$new_releases" >> $GITHUB_OUTPUT
 
       - name: Trigger downstream workflow for each new release
-        if: env.NEW_RELEASES != ''
+        if: steps.find_new.outputs.new_releases != ''
         run: |
           grep '^stable-' new_releases.txt | while IFS= read -r release; do
             echo "Triggering workflow for release: $release"
             GITHUB_TOKEN=${{ secrets.GH_TOKEN }} gh workflow run build-and-deploy-nvme-tcp.yml --ref ${{ github.ref }} -f version="$release"
           done
-      - name: Update processed releases list
-        if: env.NEW_RELEASES != ''
-        run: |
-          cat processed_releases.txt 2>/dev/null || true
-          cat new_releases.txt 2>/dev/null || true
-          cat processed_releases.txt 2>/dev/null new_releases.txt 2>/dev/null | sort -u > processed_releases.txt.tmp
-          mv processed_releases.txt.tmp processed_releases.txt
-
-      - name: Upload processed releases list
-        if: env.NEW_RELEASES != ''
-        uses: actions/upload-artifact@v4
-        with:
-          name: processed-flatcar-scripts-releases
-          path: processed_releases.txt
