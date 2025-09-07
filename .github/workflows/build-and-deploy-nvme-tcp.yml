@@ -30,7 +30,14 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up QEMU
+        if: matrix.board_arch == 'arm64'
         uses: docker/setup-qemu-action@v3
+
+      - name: verify QEMU setup
+        if: matrix.board_arch == 'arm64'
+        run: |
+          uname -m
+          docker run --rm --platform linux/arm64 docker.io/alpine uname -m
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
