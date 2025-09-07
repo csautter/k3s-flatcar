@@ -19,7 +19,16 @@ echo "CONFIG_NVME_TARGET_TCP=m" >> ~/trunk/src/third_party/coreos-overlay/sys-ke
 echo "CONFIG_NVME_TCP=m" >> ~/trunk/src/third_party/coreos-overlay/sys-kernel/coreos-modules/files/commonconfig-*
 
 # consider architecture
-if [ "$(uname -m)" = "aarch64" ]; then
+if [ -n "${BOARD_ARCH}" ] && [ "${BOARD_ARCH}" = "arm64" ]; then
+  # Ensure qemu-aarch64-static is available for cross-compilation
+  if ! [ -x /usr/bin/qemu-aarch64-static ]; then
+    echo "Error: /usr/bin/qemu-aarch64-static not found. Please install qemu-user-static on your host."
+    exit 1
+  fi
+  if ! grep -q enabled /proc/sys/fs/binfmt_misc/qemu-aarch64; then
+    echo "Error: qemu-aarch64 binfmt_misc entry not enabled. Please register qemu-aarch64-static with binfmt_misc."
+    exit 1
+  fi
   ./build_packages --board=arm64
   ./build_image --board=arm64
   ARCHITECTURE=arm64
@@ -30,8 +39,8 @@ else
 fi
 
 sudo find /build/ -name "*nvme*ko*"
-mkdir -p /opt/kernel-modules/${ARCHITECTURE:-amd64}
-sudo cp -r /build/*-usr/usr/lib/modules/*-flatcar/kernel/drivers/nvme/ /opt/kernel-modules/${ARCHITECTURE:-amd64}/
+mkdir -p /opt/kernel-modules/${BOARD_ARCH:-amd64}
+sudo cp -r /build/*-usr/usr/lib/modules/*-flatcar/kernel/drivers/nvme/ /opt/kernel-modules/${BOARD_ARCH:-amd64}/
 EOF
 container_id=$(docker ps -l -q)
 echo "Container ID: $container_id"
