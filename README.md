@@ -30,9 +30,20 @@ I have also created a [poll-flatcar-scripts-tags.yml](.github/workflows/poll-fla
 
 ### Setup flatcar to automatically download and install the NVMe-TCP kernel module
 
+#### install script
+
+1. Download the install script from [install-nvme-tcp-kernel-module.sh](scripts/install-nvme-tcp/install-nvme-tcp-kernel-module.sh) to /opt/install-nvme-tcp-kernel-module.sh.
+2. Make the script executable: `chmod +x /opt/install-nvme-tcp-kernel-module.sh`
+3. Run the script to download and install the NVMe-TCP kernel module: `sudo /opt/install-nvme-tcp-kernel-module.sh`
+
+#### systemd service
+
 1. Create a systemd service file for the NVMe-TCP kernel module.
 2. Enable the service to start on boot.
-3. Start the service to download and install the module.
+3. The service will automatically download and install the module on system startup.
+
+For simplicity, I have automated the setup of the systemd service in a bash script. Check the [create-nvme-tcp-systemd-service.sh](scripts/install-nvme-tcp/create-nvme-tcp-systemd-service.sh) script for details.
+Run the script after downloading and installing the install script to set up the systemd service.
 
 ## The .iso file
 
