@@ -46,7 +46,7 @@ jobs:
           echo "NEW_RELEASES=$new_releases"
 
       - name: Trigger downstream workflow for each new release
-        if: steps.find_new.outputs.new_releases != ''
+        if: steps.find_new.outputs.new_releases != '' && github.ref == 'refs/heads/main'
         run: |
           grep '^stable-' new_releases.txt | while IFS= read -r release; do
             echo "Triggering workflow for release: $release"
