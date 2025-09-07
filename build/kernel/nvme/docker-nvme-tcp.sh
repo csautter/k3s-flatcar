@@ -20,8 +20,8 @@ echo "CONFIG_NVME_TCP=m" >> ~/trunk/src/third_party/coreos-overlay/sys-kernel/co
 
 # consider architecture
 if [ -n "${BOARD_ARCH}" ] && [ "${BOARD_ARCH}" = "arm64" ]; then
-  ./build_packages --board=arm64
-  ./build_image --board=arm64
+  ./build_packages --board=arm64-usr
+  ./build_image --board=arm64-usr
   ARCHITECTURE=arm64
 else
   ./build_packages
@@ -30,7 +30,7 @@ else
 fi
 
 sudo find /build/ -name "*nvme*ko*"
-mkdir -p /opt/kernel-modules/${BOARD_ARCH:-amd64}
+sudo mkdir -p /opt/kernel-modules/${BOARD_ARCH:-amd64}
 sudo cp -r /build/*-usr/usr/lib/modules/*-flatcar/kernel/drivers/nvme/ /opt/kernel-modules/${BOARD_ARCH:-amd64}/
 EOF
 container_id=$(docker ps -l -q)
