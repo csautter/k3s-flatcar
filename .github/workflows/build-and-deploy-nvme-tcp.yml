@@ -108,19 +108,18 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: nvme-tcp-${{ env.VERSION }}-${{ steps.git_revision.outputs.git_revision }}
-          name: NVMe-TCP Kernel Module ${{ env.VERSION }}-${{ steps.git_revision.outputs.git_revision }}
+          name: NVMe-TCP Kernel Module for Flatcar Container Linux ${{ env.VERSION }}-${{ steps.git_revision.outputs.git_revision }}
           files: |
             nvme-tcp.ko.xz.amd64
             nvme-tcp.ko.xz.arm64
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Create release and upload package with version tag
         if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: nvme-tcp-${{ env.VERSION }}
-          name: NVMe-TCP Kernel Module ${{ env.VERSION }}
+          name: NVMe-TCP Kernel Module for Flatcar Container Linux ${{ env.VERSION }}
           files: |
             nvme-tcp.ko.xz.amd64
             nvme-tcp.ko.xz.arm64
