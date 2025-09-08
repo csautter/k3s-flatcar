@@ -36,7 +36,6 @@ if [ ! -f "${MODULE_PATH}" ]; then
 fi
 
 # Install the module to /lib/modules/$(uname -r)/extra
-# /usr/lib/modules/6.6.100-flatcar/kernel/drivers/nvme/target/host/
 INSTALL_DIR="/usr/lib/modules/$(uname -r)/extra"
 mkdir -p "${INSTALL_DIR}"
 cp -f "${MODULE_PATH}" "${INSTALL_DIR}/"
