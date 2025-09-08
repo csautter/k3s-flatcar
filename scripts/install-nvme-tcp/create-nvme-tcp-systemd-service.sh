@@ -2,9 +2,10 @@
 
 set -euox pipefail
 
+MODULES=/opt/modules
+
 function create_systemd_usr_lib_modules_mount {
-    modules=/opt/modules
-    sudo mkdir -p "${modules}" "${modules}.wd"
+    sudo mkdir -p "${MODULES}" "${MODULES}.wd"
     echo "Creating systemd mount unit for /usr/lib/modules overlay..."
     cat << EOF | sudo tee /etc/systemd/system/usr-lib-modules.mount
 [Unit]
@@ -24,21 +25,39 @@ EOF
     sudo systemctl enable --now usr-lib-modules.mount
 }
 
+# Check if /usr/lib/modules is writable and refresh overlay mount if needed
+
+if ! touch /usr/lib/modules/testfile; then
+    echo "/usr/lib/modules is read-only, setting up overlay mount..."
+    if ! mount | grep -q '/usr/lib/modules'; then
+        create_systemd_usr_lib_modules_mount
+    else
+        echo "/usr/lib/modules is already mounted."
+        rm -f /usr/lib/modules/testfile
+        systemctl disable usr-lib-modules.mount
+        rm -rf "${MODULES}" "${MODULES}.wd"
+        create_systemd_usr_lib_modules_mount
+    fi
+else
+    echo "/usr/lib/modules is writable, no overlay mount needed."
+    rm -f /usr/lib/modules/testfile
+fi
+
 if [ ! -f /etc/systemd/system/usr-lib-modules.mount ]; then
     create_systemd_usr_lib_modules_mount
 fi
 
 function create_systemd_install_nvme_tcp_service {
-    SERVICE_NAME="install-nvme-tcp-kernel-modules.service"
-    SCRIPT_PATH="/opt/install-nvme-tcp-kernel-modules.sh"
+    SERVICE_NAME="install-nvme-tcp-kernel-module.service"
+    SCRIPT_PATH="/opt/install-nvme-tcp-kernel-module.sh"
     if [ ! -f "$SCRIPT_PATH" ]; then
         echo "Error: $SCRIPT_PATH not found!"
         exit 1
     fi
-    echo "Creating systemd service to install NVMe-TCP kernel modules..."
+    echo "Creating systemd service to install NVMe-TCP kernel module..."
     cat <<EOF | sudo tee /etc/systemd/system/$SERVICE_NAME
 [Unit]
-Description=Install NVMe-TCP Kernel Modules
+Description=Install NVMe-TCP Kernel Module
 After=network.target
 
 [Service]

@@ -41,9 +41,9 @@ Some storage solutions (e.g., OpenEBS, Rancher Longhorn) require the NVMe-TCP ke
 
 ### Manual Build Steps
 
-1. Set up the [Flatcar SDK container](https://docs.flatcar.org/developers/sdk/).
+1. Set up the [Flatcar SDK container](https://github.com/orgs/flatcar/packages/container/package/flatcar-sdk-all).
 2. Modify kernel module settings as needed.
-3. Build the kernel and the module.
+3. Build the kernel and the module. See also: [Guide to building custom Flatcar images from source](https://www.flatcar.org/docs/latest/reference/developer-guides/sdk-modifying-flatcar/#start-the-sdk)
 4. Locate the built `nvme-tcp.ko.xz` file in the SDK container.
 
 ---
@@ -84,7 +84,7 @@ If flatcar was installed successfully, you can now install the NVMe-TCP kernel m
 ```sh
 # Download the install script
 curl -o /opt/install-nvme-tcp-kernel-module.sh \
-	https://raw.githubusercontent.com/csautter/k3s-flatcar/scripts/install-nvme-tcp/install-nvme-tcp-kernel-module.sh
+	https://raw.githubusercontent.com/csautter/k3s-flatcar/refs/heads/main/scripts/install-nvme-tcp/install-nvme-tcp-kernel-module.sh
 
 # Make it executable
 chmod +x /opt/install-nvme-tcp-kernel-module.sh
@@ -98,7 +98,7 @@ sudo /opt/install-nvme-tcp-kernel-module.sh
 ```sh
 # Download the service setup script
 curl -o /opt/create-nvme-tcp-systemd-service.sh \
-    https://raw.githubusercontent.com/csautter/k3s-flatcar/scripts/install-nvme-tcp/create-nvme-tcp-systemd-service.sh
+    https://raw.githubusercontent.com/csautter/k3s-flatcar/refs/heads/main/scripts/install-nvme-tcp/create-nvme-tcp-systemd-service.sh
 
 # Make it executable
 chmod +x /opt/create-nvme-tcp-systemd-service.sh
@@ -118,6 +118,11 @@ This will ensure the NVMe-TCP kernel module is automatically installed on boot.
   - Run `systemctl status nvme-tcp-install.service` for logs.
 - **ISO not booting?**
   - Verify the ISO was generated correctly and matches your hardware requirements.
+- **Overlay mount not working or writable?**
+  - `mkdir: cannot create directory ‘/usr/lib/modules/6.6.100-flatcar/extra’: Read-only file system`
+  - Check `dmesg` for errors related to the overlay filesystem.
+  - Ensure the directories `/opt/modules` and `/opt/modules.wd` exist and are writable.
+  - Run `bash create-nvme-tcp-systemd-service.sh` again to refresh the overlay mount. A restart of the system may be required afterwards.
 
 ---
 

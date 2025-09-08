@@ -2,7 +2,7 @@
 # install-nvme-tcp-kernel-module.sh
 # Installs the nvme-tcp kernel module matching the current Flatcar release.
 
-set -euo pipefail
+set -euox pipefail
 
 REPO="csautter/k3s-flatcar"
 MODULE_NAME="nvme-tcp"
