@@ -1,40 +1,132 @@
-# k3s on flatcar linux
+# k3s on Flatcar Linux
 
-This project is intended as reference for a k3s installation on Flatcar Linux. The generated .iso file can be used to setup VMs or Bare Metal Machines.
+This project provides a reference implementation for installing [k3s](https://k3s.io/) (a lightweight Kubernetes distribution) on [Flatcar Linux](https://www.flatcar.org/). It automates the process of building and deploying the NVMe-TCP kernel module, and generates a ready-to-use ISO for VM or bare metal installation.
+
+---
+
+## Table of Contents
+
+- [Project Overview](#project-overview)
+- [Scripts](#scripts)
+- [Building Kernel Modules](#building-kernel-modules)
+- [Automated Workflows](#automated-workflows)
+- [Installation & Usage](#installation--usage)
+- [Troubleshooting](#troubleshooting)
+- [License](#license)
+- [Contributing](#contributing)
+
+---
+
+## Project Overview
+
+This repository helps you:
+
+- Build and deploy the NVMe-TCP kernel module for Flatcar Linux (required for storage solutions like OpenEBS or Rancher Longhorn).
+- Generate an ISO image with pre-configured ignition files for Flatcar and k3s.
+- Automate installation and setup using scripts and GitHub Actions workflows.
 
 ## Scripts
 
-- [scripts/convert-to-json-ignition.sh](scripts/convert-to-json-ignition.sh) - Converts the yaml butane config to json ignition config.
-- [scripts/generate-config-iso.sh](scripts/generate-config-iso.sh) - Generates an ISO image with the ignition config. Can be used for setup on bare metal or when the common provision approach is not available.
-- [scripts/server-2-install.sh](scripts/server-2-install.sh) - Installs the second k3s server on a Flatcar Linux node.
+- [`scripts/convert-to-json-ignition.sh`](scripts/convert-to-json-ignition.sh): Converts YAML Butane config to JSON Ignition config.
+- [`scripts/generate-config-iso.sh`](scripts/generate-config-iso.sh): Generates an ISO image with the ignition config for bare metal or VM setup.
+- [`scripts/server-2-install.sh`](scripts/server-2-install.sh): Installs the second k3s server on a Flatcar Linux node.
+- [`scripts/install-nvme-tcp/install-nvme-tcp-kernel-module.sh`](scripts/install-nvme-tcp/install-nvme-tcp-kernel-module.sh): Installs the NVMe-TCP kernel module.
+- [`scripts/install-nvme-tcp/create-nvme-tcp-systemd-service.sh`](scripts/install-nvme-tcp/create-nvme-tcp-systemd-service.sh): Sets up a systemd service for automatic module installation.
+
+---
 
 ## Building Kernel Modules
 
-For some storage solutions like OpenEBS or Rancher Longhorn the nvme tcp kernel module is required but not included with flatcar linux by default.
-Therefore, it needs to be built and deployed separately. The flatcar linux documentation provides guidance on how to do this. Unfortunately for the nvme tcp kernel module, the process is not as straightforward as it could be. I was not able to find a clear step-by-step guide for this specific module.
-In my experience the best way to build and deploy the nvme tcp kernel module is building flatcar linux from source with the flatcar SDK container. Kernel module settings can be changed before building the kernel and other dependencies. After a complete build the kernel module can be found in the default kernel module path within the SDK container.
+Some storage solutions (e.g., OpenEBS, Rancher Longhorn) require the NVMe-TCP kernel module, which is not included in Flatcar Linux by default. This project provides scripts and workflows to automate building and deploying this module.
 
-### Building the Kernel Module
+### Manual Build Steps
 
-1. Set up the Flatcar SDK container.
-2. Modify the kernel module settings as needed.
+1. Set up the [Flatcar SDK container](https://docs.flatcar.org/developers/sdk/).
+2. Modify kernel module settings as needed.
 3. Build the kernel and the module.
 4. Locate the built `nvme-tcp.ko.xz` file in the SDK container.
 
-### Github Actions Workflow for NVMe-TCP Kernel Module
+---
 
-To make the process of building and deploying the nvme tcp kernel module easier, I have used a Github Actions workflow. This workflow automates the steps required to build the module and create a release.
+## Automated Workflows
 
-Check the [build-and-deploy-nvme-tcp.yml](.github/workflows/build-and-deploy-nvme-tcp.yml) file for the workflow definition.
-I have also created a [poll-flatcar-scripts-tags.yml](.github/workflows/poll-flatcar-scripts-tags.yml) workflow for polling the Flatcar scripts repository for new releases. All new releases are automatically built and deployed using the NVMe-TCP kernel module workflow.
+GitHub Actions are used to automate building and deploying the NVMe-TCP kernel module:
 
-### Setup flatcar to automatically download and install the NVMe-TCP kernel module
+- [`build-and-deploy-nvme-tcp.yml`](.github/workflows/build-and-deploy-nvme-tcp.yml): Builds the module and creates a release.
+- [`poll-flatcar-scripts-tags.yml`](.github/workflows/poll-flatcar-scripts-tags.yml): Polls the Flatcar scripts repository for new releases and triggers builds.
 
-1. Create a systemd service file for the NVMe-TCP kernel module.
-2. Enable the service to start on boot.
-3. Start the service to download and install the module.
+---
 
-## The .iso file
+## Installation & Usage
 
-The iso file is intended to be used for installation of flatcar and k3s. First you need to boot from the flatcar iso file.
-The generated iso file contains ready to use configuration which can be used for easy configuration of flatcar and k3s.
+### 1. Generate the ISO
+
+```sh
+# Convert Butane YAML to Ignition JSON
+./scripts/convert-to-json-ignition.sh <input.yaml> <output.json>
+
+# Generate the ISO image
+./scripts/generate-config-iso.sh <ignition.json>
+```
+
+The generated ISO can be used to install Flatcar and k3s on your target machine.
+
+---
+
+### 2. Install flatcar with k3s
+
+Boot from the generated ISO and follow the flatcar documentation instructions to install Flatcar. The k3s installation will be handled automatically by the ignition file.
+
+### 3. Install the NVMe-TCP Kernel Module
+
+If flatcar was installed successfully, you can now install the NVMe-TCP kernel module.
+
+```sh
+# Download the install script
+curl -o /opt/install-nvme-tcp-kernel-module.sh \
+	https://raw.githubusercontent.com/csautter/k3s-flatcar/scripts/install-nvme-tcp/install-nvme-tcp-kernel-module.sh
+
+# Make it executable
+chmod +x /opt/install-nvme-tcp-kernel-module.sh
+
+# Run the script (as root)
+sudo /opt/install-nvme-tcp-kernel-module.sh
+```
+
+### 4. Set Up the Systemd Service
+
+```sh
+# Download the service setup script
+curl -o /opt/create-nvme-tcp-systemd-service.sh \
+    https://raw.githubusercontent.com/csautter/k3s-flatcar/scripts/install-nvme-tcp/create-nvme-tcp-systemd-service.sh
+
+# Make it executable
+chmod +x /opt/create-nvme-tcp-systemd-service.sh
+
+# Run the setup script to create and enable the systemd service
+sudo bash /opt/create-nvme-tcp-systemd-service.sh
+```
+
+This will ensure the NVMe-TCP kernel module is automatically installed on boot.
+
+## Troubleshooting
+
+- **Kernel module not loading?**
+  - Check `dmesg` and `lsmod | grep nvme` for errors.
+  - Ensure the kernel version matches the module version.
+- **Systemd service not starting?**
+  - Run `systemctl status nvme-tcp-install.service` for logs.
+- **ISO not booting?**
+  - Verify the ISO was generated correctly and matches your hardware requirements.
+
+---
+
+## License
+
+This project is licensed under the terms of the [MIT License](LICENSE).
+
+---
+
+## Contributing
+
+Contributions are welcome! Please open issues or submit pull requests for improvements, bug fixes, or new features.
