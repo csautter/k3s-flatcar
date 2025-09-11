@@ -10,8 +10,10 @@ function create_systemd_usr_lib_modules_mount {
     cat << EOF | sudo tee /etc/systemd/system/usr-lib-modules.mount
 [Unit]
 Description=Custom Kernel Modules
-Before=local-fs.target
 ConditionPathExists=/opt/modules
+Before=sysinit.target
+After=systemd-sysext.service
+DefaultDependencies=no
 
 [Mount]
 Type=overlay
@@ -20,7 +22,7 @@ Where=/usr/lib/modules
 Options=lowerdir=/usr/lib/modules,upperdir=/opt/modules,workdir=/opt/modules.wd
 
 [Install]
-WantedBy=local-fs.target
+UpheldBy=systemd-sysext.service
 EOF
     sudo systemctl enable --now usr-lib-modules.mount
 }
@@ -29,12 +31,13 @@ EOF
 
 if ! touch /usr/lib/modules/testfile; then
     echo "/usr/lib/modules is read-only, setting up overlay mount..."
-    if ! mount | grep -q '/usr/lib/modules'; then
+    if ! mount | grep -q 'on /usr/lib/modules'; then
         create_systemd_usr_lib_modules_mount
     else
         echo "/usr/lib/modules is already mounted."
         rm -f /usr/lib/modules/testfile
-        systemctl disable usr-lib-modules.mount
+        systemctl disable usr-lib-modules.mount || true
+        sudo umount /usr/lib/modules || true
         rm -rf "${MODULES}" "${MODULES}.wd"
         create_systemd_usr_lib_modules_mount
     fi
@@ -68,7 +71,8 @@ RemainAfterExit=yes
 [Install]
 WantedBy=multi-user.target
 EOF
-    sudo systemctl enable --now $SERVICE_NAME
+    sudo systemctl enable $SERVICE_NAME
+    sudo systemctl start $SERVICE_NAME
 }
 
 if [ ! -f /etc/systemd/system/install-nvme-tcp-kernel-modules.service ]; then
