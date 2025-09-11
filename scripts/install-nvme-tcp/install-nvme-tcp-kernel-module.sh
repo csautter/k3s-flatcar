@@ -14,14 +14,14 @@ elif [ "$ARCH" = "aarch64" ]; then
 fi
 
 # Get current Flatcar version
-FLATCAR_VERSION=$(cat /etc/os-release | grep VERSION | cut -d= -f2 | tr -d '"')
-FLATCAR_BUILD_ID=$(cat /etc/os-release | grep BUILD_ID | cut -d= -f2 | tr -d '"')
+FLATCAR_VERSION=$(cat /etc/os-release | grep VERSION= | cut -d= -f2 | tr -d '"')
+FLATCAR_BUILD_ID=$(cat /etc/os-release | grep BUILD_ID= | cut -d= -f2 | tr -d '"')
 echo "Current Flatcar version: $FLATCAR_VERSION-$FLATCAR_BUILD_ID"
 
-TAG="${MODULE_NAME}-${ARCH}-stable-${FLATCAR_VERSION}"
+TAG="${MODULE_NAME}-stable-${FLATCAR_VERSION}"
 
 # Download URL for the kernel module
-MODULE_URL="https://github.com/${REPO}/releases/download/${TAG}/${MODULE_NAME}.ko.xz"
+MODULE_URL="https://github.com/${REPO}/releases/download/${TAG}/${MODULE_NAME}.ko.xz.${ARCH}"
 
 MODULE_DIR="/opt/nvme-tcp"
 MODULE_PATH="${MODULE_DIR}/${MODULE_NAME}.ko.xz"
