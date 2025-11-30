@@ -52,6 +52,11 @@ jobs:
         if: matrix.board_arch == 'arm64'
         uses: docker/setup-qemu-action@v3
 
+      - name: Check QEMU binary
+        if: matrix.board_arch == 'arm64'
+        run: |
+          which qemu-aarch64-static || echo "QEMU not found"
+
       - name: verify QEMU setup
         if: matrix.board_arch == 'arm64'
         run: |
