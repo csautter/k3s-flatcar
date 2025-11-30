@@ -24,7 +24,7 @@ TAG="${MODULE_NAME}-${ARCH}-stable-${FLATCAR_VERSION}"
 MODULE_URL="https://github.com/${REPO}/releases/download/${TAG}/${MODULE_NAME}.ko.xz"
 
 MODULE_DIR="/opt/nvme-tcp"
-MODULE_PATH="${MODULE_DIR}/${MODULE_NAME}.ko.xz"
+MODULE_PATH="${MODULE_DIR}/${TAG}.ko.xz"
 
 # Create directory for the module
 mkdir -p "${MODULE_DIR}"
