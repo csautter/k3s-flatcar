@@ -53,6 +53,7 @@ jobs:
               echo "Skipping release: $release"
               continue
             fi
+            version_major=$(echo $release | sed -E 's/^.*?-//' | cut -d. -f1)
             echo "Triggering workflow for release: $release"
-            GITHUB_TOKEN=${{ secrets.GH_TOKEN }} gh workflow run build-and-deploy-nvme-tcp.yml --ref ${{ github.ref }} -f version="$release"
+            GITHUB_TOKEN=${{ secrets.GH_TOKEN }} gh workflow run build-and-deploy-nvme-tcp.yml --ref ${{ github.ref }} -f version="$release" -f version_major="$version_major"
           done

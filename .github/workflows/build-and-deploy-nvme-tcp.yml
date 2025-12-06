@@ -11,15 +11,19 @@ on:
       version:
         description: "Kernel module version"
         required: true
+      version_major:
+        description: "Major version (e.g., 4230)"
+        required: true
 
 env:
   VERSION: ${{ inputs.version || 'stable-4230.2.2' }}
+  VERSION_MAJOR: ${{ inputs.version_major || '4230' }}
 
 jobs:
   build:
     runs-on: arc-runner-set-k3s-flatcar
     container:
-      image: ubuntu:24.04
+      image: ghcr.io/flatcar/flatcar-sdk-all:${{ inputs.version_major || '4230' }}.0.0
     strategy:
       matrix:
         board_arch: [amd64, arm64]
@@ -28,26 +32,12 @@ jobs:
       BOARD_ARCH: ${{ matrix.board_arch }}
 
     steps:
-      - name: Install Git
-        run: |
-          apt update
-          apt install -y git
-
       - name: Mark repo as safe for git
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Docker Build Environment
-        run: |
-          apt update
-          apt install -y apt-transport-https curl gpg software-properties-common
-          mkdir -p /etc/apt/keyrings
-          curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-          echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
-          apt update
-          apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
       - name: Set up QEMU
         if: matrix.board_arch == 'arm64'
         uses: docker/setup-qemu-action@v3
@@ -62,26 +52,22 @@ jobs:
         run: |
           uname -m
           docker run --rm --platform linux/arm64 docker.io/alpine uname -m
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
       - name: Run docker-nvme-tcp.sh
-        if: github.ref == 'refs/heads/main'
+        # if: github.ref == 'refs/heads/main'
         run: |
           if [ "${{ matrix.board_arch }}" = "arm64" ]; then
             echo "Building for ARM64 architecture"
           else
             echo "Building for AMD64 architecture"
           fi
-          chmod +x build/kernel/nvme/docker-nvme-tcp.sh
-          ./build/kernel/nvme/docker-nvme-tcp.sh
+          chmod +x build/kernel/nvme/docker-nvme-tcp-inner-script.sh
+          ./build/kernel/nvme/docker-nvme-tcp-inner-script.sh
 
-      - name: Simulate docker-nvme-tcp.sh output file
-        if: github.ref != 'refs/heads/main'
-        run: |
-          mkdir -p build/kernel/nvme
-          echo "dummy nvme tcp module" > build/kernel/nvme/nvme-tcp.ko.xz
+      #- name: Simulate docker-nvme-tcp.sh output file
+      #  if: github.ref != 'refs/heads/main'
+      #  run: |
+      #    mkdir -p build/kernel/nvme
+      #    echo "dummy nvme tcp module" > build/kernel/nvme/nvme-tcp.ko.xz
 
       - name: Find built nvme-tcp.ko.xz
         id: find_nvme
@@ -103,7 +89,7 @@ jobs:
           path: ${{ steps.find_nvme.outputs.nvme_path }}
 
   deploy:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu:24.04
     needs: build
     permissions:
       contents: write
