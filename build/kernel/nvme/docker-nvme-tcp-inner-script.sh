@@ -7,6 +7,7 @@ fi
 
 cd /home/sdk/trunk/src/scripts
 yes "" | ../sdk_init_selfcontained.sh
+git config --global --add safe.directory /mnt/host/source/src/scripts
 git checkout $VERSION
 echo "CONFIG_NVME_TARGET_TCP=m" >> ~/trunk/src/third_party/coreos-overlay/sys-kernel/coreos-modules/files/commonconfig-*
 echo "CONFIG_NVME_TCP=m" >> ~/trunk/src/third_party/coreos-overlay/sys-kernel/coreos-modules/files/commonconfig-*
