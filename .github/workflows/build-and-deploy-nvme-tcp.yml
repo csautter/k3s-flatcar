@@ -26,7 +26,7 @@ jobs:
       image: ghcr.io/flatcar/flatcar-sdk-all:${{ inputs.version_major || '4230' }}.0.0
     strategy:
       matrix:
-        board_arch: [amd64, arm64]
+        board_arch: [amd64]
 
     env:
       BOARD_ARCH: ${{ matrix.board_arch }}
