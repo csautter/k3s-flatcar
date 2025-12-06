@@ -5,7 +5,7 @@ if [ -z "$VERSION" ]; then
     VERSION=stable-4230.2.2
 fi
 
-cd ~/trunk/src/scripts
+cd /home/sdk/trunk/src/scripts
 yes "" | ../sdk_init_selfcontained.sh
 git checkout $VERSION
 echo "CONFIG_NVME_TARGET_TCP=m" >> ~/trunk/src/third_party/coreos-overlay/sys-kernel/coreos-modules/files/commonconfig-*
