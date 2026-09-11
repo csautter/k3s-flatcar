@@ -6,11 +6,20 @@ on:
     paths:
       - "build/kernel/nvme/docker-nvme-tcp.sh"
       - ".github/workflows/build-and-deploy-nvme-tcp.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "build/kernel/nvme/docker-nvme-tcp.sh"
+      - ".github/workflows/build-and-deploy-nvme-tcp.yml"
   workflow_dispatch:
     inputs:
       version:
         description: "Kernel module version"
         required: true
+
+concurrency:
+  group: build-and-deploy-nvme-tcp-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   VERSION: ${{ inputs.version || 'stable-4230.2.2' }}
