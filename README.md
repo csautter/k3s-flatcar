@@ -115,7 +115,7 @@ This will ensure the NVMe-TCP kernel module is automatically installed on boot.
   - Check `dmesg` and `lsmod | grep nvme` for errors.
   - Ensure the kernel version matches the module version.
 - **Systemd service not starting?**
-  - Run `systemctl status nvme-tcp-install.service` for logs.
+  - Run `systemctl status install-nvme-tcp-kernel-module.service` for logs.
 - **ISO not booting?**
   - Verify the ISO was generated correctly and matches your hardware requirements.
 - **Overlay mount not working or writable?**

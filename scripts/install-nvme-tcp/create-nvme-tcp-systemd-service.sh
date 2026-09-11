@@ -75,6 +75,6 @@ EOF
     sudo systemctl start $SERVICE_NAME
 }
 
-if [ ! -f /etc/systemd/system/install-nvme-tcp-kernel-modules.service ]; then
+if [ ! -f /etc/systemd/system/install-nvme-tcp-kernel-module.service ]; then
     create_systemd_install_nvme_tcp_service
 fi
