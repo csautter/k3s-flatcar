@@ -18,6 +18,12 @@ git checkout $VERSION
 echo "CONFIG_NVME_TARGET_TCP=m" >> ~/trunk/src/third_party/coreos-overlay/sys-kernel/coreos-modules/files/commonconfig-*
 echo "CONFIG_NVME_TCP=m" >> ~/trunk/src/third_party/coreos-overlay/sys-kernel/coreos-modules/files/commonconfig-*
 
+# crates.io rejects distfile downloads made with wget's bare default
+# User-Agent (403), which portage hits whenever a package falls back to
+# crates.io after its mirrors are missing a crate (e.g. coreos-base/afterburn's
+# hostname-0.4.2.crate). A descriptive User-Agent avoids that block.
+sudo sh -c 'echo "user_agent = Mozilla/5.0 (X11; Linux x86_64) Flatcar-SDK-Build" >> /etc/wgetrc'
+
 # consider architecture
 if [ -n "${BOARD_ARCH}" ] && [ "${BOARD_ARCH}" = "arm64" ]; then
   ./build_packages --board=arm64-usr
