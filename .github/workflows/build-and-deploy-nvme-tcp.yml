@@ -43,7 +43,7 @@ jobs:
 
       - name: Set up QEMU
         if: matrix.board_arch == 'arm64'
-        uses: docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@v4
 
       - name: verify QEMU setup
         if: matrix.board_arch == 'arm64'
