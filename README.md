@@ -54,6 +54,12 @@ GitHub Actions are used to automate building and deploying the NVMe-TCP kernel m
 
 - [`build-and-deploy-nvme-tcp.yml`](.github/workflows/build-and-deploy-nvme-tcp.yml): Builds the module and creates a release.
 - [`poll-flatcar-scripts-tags.yml`](.github/workflows/poll-flatcar-scripts-tags.yml): Polls the Flatcar scripts repository for new releases and triggers builds.
+- [`renovate.yml`](.github/workflows/renovate.yml): Runs [Renovate](https://docs.renovatebot.com/) on a weekly schedule to keep the Flatcar SDK version, k3s version, and Butane image tag up to date via pull requests.
+
+Dependency updates are automated:
+
+- **[Dependabot](.github/dependabot.yml)** keeps the GitHub Actions used in these workflows up to date.
+- **[Renovate](renovate.json)** tracks the Flatcar SDK/scripts version, the k3s version, and the Butane Docker image tag, which aren't covered by Dependabot's built-in ecosystems.
 
 ---
 

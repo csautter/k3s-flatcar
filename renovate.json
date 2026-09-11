@@ -1,0 +1,45 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "dependencyDashboard": true,
+  "labels": ["dependencies"],
+  "platformAutomerge": false,
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Flatcar SDK/scripts version pin used to build the nvme-tcp kernel module",
+      "managerFilePatterns": [
+        "^build/kernel/nvme/docker-nvme-tcp\\.sh$",
+        "^\\.github/workflows/build-and-deploy-nvme-tcp\\.yml$"
+      ],
+      "matchStrings": [
+        "(?<currentValue>stable-\\d+\\.\\d+\\.\\d+)"
+      ],
+      "depNameTemplate": "flatcar/scripts",
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "regex:^stable-(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)$"
+    },
+    {
+      "customType": "regex",
+      "description": "k3s version pinned in the example env file, consumed by the Ignition configs",
+      "managerFilePatterns": ["^scripts/\\.env\\.example$"],
+      "matchStrings": [
+        "K3S_VERSION=\"(?<currentValue>[^\"]+)\""
+      ],
+      "depNameTemplate": "k3s-io/k3s",
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "regex:^v(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)\\+k3s(?<build>\\d+)$"
+    },
+    {
+      "customType": "regex",
+      "description": "Butane Docker image used to convert Butane YAML to Ignition JSON",
+      "managerFilePatterns": ["^scripts/convert-to-json-ignition\\.sh$"],
+      "matchStrings": [
+        "quay\\.io/coreos/butane:(?<currentValue>[^\\s]+)"
+      ],
+      "depNameTemplate": "quay.io/coreos/butane",
+      "datasourceTemplate": "docker",
+      "versioningTemplate": "semver-coerced"
+    }
+  ]
+}
