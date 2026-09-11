@@ -7,6 +7,10 @@ on:
     branches: [main, feat/*]
   workflow_dispatch:
 
+concurrency:
+  group: poll-flatcar-scripts-tags
+  cancel-in-progress: false
+
 jobs:
   poll-flatcar-scripts-tags:
     runs-on: ubuntu-latest
@@ -17,7 +21,7 @@ jobs:
       - name: Fetch last 20 release versions from flatcar/scripts
         id: get_releases
         run: |
-          curl -s "https://api.github.com/repos/flatcar/scripts/releases?per_page=20" | jq -r '.[].tag_name' > latest_releases.txt
+          curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" "https://api.github.com/repos/flatcar/scripts/releases?per_page=20" | jq -r '.[].tag_name' > latest_releases.txt
           echo "LATEST_RELEASES=$(cat latest_releases.txt | paste -sd "," -)" >> $GITHUB_ENV
 
       - name: Fetch all release tags from this repo
@@ -26,7 +30,7 @@ jobs:
           page=1
           > own_releases.txt
           while :; do
-            releases=$(curl -s "https://api.github.com/repos/${{ github.repository }}/releases?per_page=100&page=$page")
+            releases=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" "https://api.github.com/repos/${{ github.repository }}/releases?per_page=100&page=$page")
             count=$(echo "$releases" | jq 'length')
             if [ "$count" -eq 0 ]; then
               break
@@ -54,5 +58,5 @@ jobs:
               continue
             fi
             echo "Triggering workflow for release: $release"
-            GITHUB_TOKEN=${{ secrets.GH_TOKEN }} gh workflow run build-and-deploy-nvme-tcp.yml --ref ${{ github.ref }} -f version="$release"
+            GITHUB_TOKEN=${{ secrets.GH_TOKEN }} gh workflow run build-and-deploy-nvme-tcp.yml --ref ${{ github.ref_name }} -f version="$release"
           done
