@@ -160,10 +160,11 @@ src=\$(nvme_module_dir) || {
   echo "ERROR: no nvme-tcp module under /build/$BOARD/usr/lib/modules/*-flatcar/kernel/drivers/nvme/"
   exit 1
 }
-# A partial kernel build could leave a module that exists but will not load,
-# which the presence check above would not catch. Confirm the module was built
-# for this kernel and is signed, and list the module set so a targeted build
-# that silently dropped some of drivers/nvme is visible in the log.
+# A module that exists but will not load would pass the presence check above,
+# so confirm it was built for this kernel and list the module set. The signer
+# is reported, not required: commonconfig sets CONFIG_MODULE_SIG=y without
+# CONFIG_MODULE_SIG_ALL, so modules_install does not sign them and this line
+# reads "no signer reported" on a correct build.
 kver=\${src#*/usr/lib/modules/}
 kver=\${kver%%/*}
 mod=\$(sudo find "\$src" -name 'nvme-tcp.ko*' -print -quit)
