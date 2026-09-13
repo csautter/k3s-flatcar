@@ -17,6 +17,10 @@ CONTAINER_NAME=ghcr.io/flatcar/flatcar-sdk-all:$VERSION_MAJOR.0.0
 ARCH=${BOARD_ARCH:-amd64}
 BOARD=$ARCH-usr
 
+# Set to 0 to disable the targeted drivers/nvme kernel build and compile every
+# module, as coreos-modules does by default.
+TARGETED_KERNEL_BUILD=${TARGETED_KERNEL_BUILD:-1}
+
 docker pull $CONTAINER_NAME
 mkdir -p ./deployments/kernel/nvme/modules
 cat <<EOF | docker run -i --privileged -v /dev:/dev -v ./deployments/kernel/nvme/modules:/opt/kernel-modules/ $CONTAINER_NAME bash
@@ -120,6 +124,66 @@ sudo du -sh /build/$BOARD 2>/dev/null || true
 df -h /build /var/tmp 2>/dev/null || true
 echo "=== END PORTAGE PATHS ==="
 
+# Build only the NVMe modules instead of every module in the tree.
+#
+# Phase timing showed the coreos-modules emerge is ~89% of the build (86m52s of
+# 97m on amd64), and its one source build is the kernel: src_compile runs
+# "kmake vmlinux modules", compiling thousands of modules of which we keep
+# nine. vmlinux is still required -- modpost resolves module symbols against
+# it -- but the module compile can be restricted to drivers/nvme.
+#
+# This overrides src_compile through /etc/portage/env, which portage sources
+# into the ebuild environment after the eclasses, so the override sees kmake
+# and setup_keys. It must be written after setup_board, which regenerates
+# /build/<board>/etc/portage.
+#
+# The override is self-correcting: kbuild's support for in-tree directory
+# targets is what makes this work, and if that does not produce modules here
+# it falls back to a full "kmake modules" inside the same phase rather than
+# failing the build or costing another CI cycle. modules.order is trimmed to
+# the modules actually built, because modules_install walks it and would
+# otherwise fail on every module the targeted build skipped.
+if [ "$TARGETED_KERNEL_BUILD" = "1" ]; then
+  echo "Installing targeted drivers/nvme kernel build override"
+  sudo mkdir -p /build/$BOARD/etc/portage/env
+  sudo tee /build/$BOARD/etc/portage/env/coreos-modules-nvme.conf >/dev/null <<'ENVEOF'
+src_compile() {
+	local t0 t1 t2 order="\${S}/build/modules.order"
+
+	setup_keys
+
+	t0=\$(date +%s)
+	kmake vmlinux
+	t1=\$(date +%s)
+	einfo "TIMING vmlinux \$(( t1 - t0 ))s"
+
+	if nonfatal kmake drivers/nvme/ &&
+		[ -n "\$(find "\${S}/build/drivers/nvme" -name '*.ko' -print -quit 2>/dev/null)" ] &&
+		grep '^drivers/nvme/' "\${order}" > "\${T}/modules.order.nvme" &&
+		[ -s "\${T}/modules.order.nvme" ]
+	then
+		einfo "targeted drivers/nvme module build succeeded"
+		mv "\${T}/modules.order.nvme" "\${order}" || die
+	else
+		ewarn "targeted drivers/nvme build unusable, compiling all modules"
+		kmake modules
+	fi
+	t2=\$(date +%s)
+	einfo "TIMING modules \$(( t2 - t1 ))s"
+}
+ENVEOF
+  # package.env may be a file or a directory depending on the profile.
+  pkgenv=/build/$BOARD/etc/portage/package.env
+  if [ -f "\$pkgenv" ]; then
+    echo 'sys-kernel/coreos-modules coreos-modules-nvme.conf' | sudo tee -a "\$pkgenv" >/dev/null
+  else
+    sudo mkdir -p "\$pkgenv"
+    echo 'sys-kernel/coreos-modules coreos-modules-nvme.conf' | sudo tee "\$pkgenv/coreos-modules-nvme" >/dev/null
+  fi
+else
+  echo "Targeted drivers/nvme kernel build disabled, compiling all modules"
+fi
+
 export KBUILD_BUILD_USER="\${BUILD_USER:-build}"
 export KBUILD_BUILD_HOST="\${BUILD_HOST:-pony-truck.infra.kinvolk.io}"
 
@@ -148,6 +212,28 @@ src=\$(nvme_module_dir) || {
   echo "ERROR: no nvme-tcp module under /build/$BOARD/usr/lib/modules/*-flatcar/kernel/drivers/nvme/"
   exit 1
 }
+# A partial kernel build could leave a module that exists but will not load,
+# which the presence check above would not catch. Confirm the module was built
+# for this kernel and is signed, and list the module set so a targeted build
+# that silently dropped some of drivers/nvme is visible in the log.
+kver=\${src#*/usr/lib/modules/}
+kver=\${kver%%/*}
+mod=\$(sudo find "\$src" -name 'nvme-tcp.ko*' -print -quit)
+echo "=== MODULE CHECK (kernel \$kver) ==="
+if vermagic=\$(sudo modinfo -F vermagic "\$mod" 2>/dev/null) && [ -n "\$vermagic" ]; then
+  echo "vermagic: \$vermagic"
+  case "\$vermagic" in
+    "\$kver"*) echo "vermagic matches \$kver" ;;
+    *) echo "ERROR: vermagic '\$vermagic' does not match kernel \$kver"; exit 1 ;;
+  esac
+  signer=\$(sudo modinfo -F signer "\$mod" 2>/dev/null || true)
+  if [ -n "\$signer" ]; then echo "signed by: \$signer"; else echo "WARNING: no signer reported"; fi
+else
+  echo "WARNING: modinfo could not read \$mod; skipping vermagic check"
+fi
+sudo find "\$src" -name '*.ko*' | sed 's#.*/##' | sort
+echo "=== END MODULE CHECK ==="
+
 echo "Copying NVMe modules from \$src"
 sudo mkdir -p /opt/kernel-modules/$ARCH
 sudo cp -r "\$src" /opt/kernel-modules/$ARCH/
