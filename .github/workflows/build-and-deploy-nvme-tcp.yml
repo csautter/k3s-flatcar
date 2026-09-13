@@ -18,7 +18,12 @@ on:
         required: true
 
 concurrency:
-  group: build-and-deploy-nvme-tcp-${{ github.ref }}
+  # The version is part of the group so that the poll workflow, which dispatches
+  # one run per new upstream release in a loop, does not cancel its own runs:
+  # they all target refs/heads/main and would otherwise share a single group,
+  # leaving only the last release built. push/pull_request runs carry no version
+  # input, so they share the "-ci" group and keep cancelling stale CI runs.
+  group: build-and-deploy-nvme-tcp-${{ github.ref }}-${{ github.event.inputs.version || 'ci' }}
   cancel-in-progress: true
 
 env:
