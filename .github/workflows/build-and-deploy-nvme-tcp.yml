@@ -28,10 +28,14 @@ concurrency:
 
 env:
   VERSION: ${{ inputs.version || 'stable-4230.2.2' }}
-  # Real SDK build on main, and on any branch when explicitly dispatched, so a
-  # change can be validated from its PR before merging. Automatic push and
-  # pull_request runs on other refs stay cheap and use the stub module below.
-  REAL_BUILD: ${{ github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' }}
+  # Real SDK builds only on an explicit dispatch, on any branch. A dispatch is
+  # how every release is actually built (the poll workflow dispatches one per
+  # new upstream release) and how a change is validated from its PR, so nothing
+  # needs the ~1-2h build to run automatically. Before this, a push to main ran
+  # a full build of the default VERSION that published nothing -- pure waste on
+  # every merge touching these files. Automatic push and pull_request runs now
+  # always take the cheap stub path below.
+  REAL_BUILD: ${{ github.event_name == 'workflow_dispatch' }}
 
 jobs:
   build:
