@@ -17,10 +17,6 @@ CONTAINER_NAME=ghcr.io/flatcar/flatcar-sdk-all:$VERSION_MAJOR.0.0
 ARCH=${BOARD_ARCH:-amd64}
 BOARD=$ARCH-usr
 
-# Set to 0 to disable the targeted drivers/nvme kernel build and compile every
-# module, as coreos-modules does by default.
-TARGETED_KERNEL_BUILD=${TARGETED_KERNEL_BUILD:-1}
-
 docker pull $CONTAINER_NAME
 mkdir -p ./deployments/kernel/nvme/modules
 cat <<EOF | docker run -i --privileged -v /dev:/dev -v ./deployments/kernel/nvme/modules:/opt/kernel-modules/ $CONTAINER_NAME bash
@@ -124,70 +120,17 @@ sudo du -sh /build/$BOARD 2>/dev/null || true
 df -h /build /var/tmp 2>/dev/null || true
 echo "=== END PORTAGE PATHS ==="
 
-# Build only the NVMe modules instead of every module in the tree.
-#
-# Phase timing showed the coreos-modules emerge is ~89% of the build (86m52s of
-# 97m on amd64), and its one source build is the kernel: src_compile runs
-# "kmake vmlinux modules", compiling thousands of modules of which we keep
-# nine. vmlinux is still required -- modpost resolves module symbols against
-# it -- but the module compile can be restricted to drivers/nvme.
-#
-# The override goes in /etc/portage/env/<category>/<package>, which portage
-# sources as bash into the ebuild environment after the eclasses
-# (source_all_bashrcs), so it can call the eclass's kmake and setup_keys.
-#
-# It must NOT go through package.env: those files are read by portage's
-# getconfig() as strict KEY=value pairs, so a function definition aborts every
-# emerge against the board with
-#   ParseError: line 1: Invalid token '(' (not '=')
-# That took out build_packages too, which is why the guard below exists.
-#
-# Written after setup_board, which regenerates /build/<board>/etc/portage.
-override_file=/build/$BOARD/etc/portage/env/sys-kernel/coreos-modules
-override_installed=0
-if [ "$TARGETED_KERNEL_BUILD" != "1" ]; then
-  echo "Targeted drivers/nvme kernel build disabled, compiling all modules"
-elif [ -e "\$override_file" ]; then
-  echo "WARNING: \$override_file already exists; not overwriting SDK config, compiling all modules"
-else
-  echo "Installing targeted drivers/nvme kernel build override"
-  sudo mkdir -p "\$(dirname "\$override_file")"
-  sudo tee "\$override_file" >/dev/null <<'ENVEOF'
-src_compile() {
-	local t0 t1 t2 order="\${S}/build/modules.order"
-
-	setup_keys
-
-	t0=\$(date +%s)
-	kmake vmlinux
-	t1=\$(date +%s)
-	einfo "TIMING vmlinux \$(( t1 - t0 ))s"
-
-	if nonfatal kmake drivers/nvme/ &&
-		[ -n "\$(find "\${S}/build/drivers/nvme" -name '*.ko' -print -quit 2>/dev/null)" ] &&
-		grep '^drivers/nvme/' "\${order}" > "\${T}/modules.order.nvme" &&
-		[ -s "\${T}/modules.order.nvme" ]
-	then
-		einfo "targeted drivers/nvme module build succeeded"
-		mv "\${T}/modules.order.nvme" "\${order}" || die
-	else
-		ewarn "targeted drivers/nvme build unusable, compiling all modules"
-		kmake modules
-	fi
-	t2=\$(date +%s)
-	einfo "TIMING modules \$(( t2 - t1 ))s"
-}
-ENVEOF
-  # Cheap guard: resolve the package with the override in place. A config-level
-  # rejection shows up here in seconds instead of breaking the build, and the
-  # optimisation is simply dropped rather than costing a release.
-  if emerge-$BOARD --pretend --quiet sys-kernel/coreos-modules >/dev/null 2>&1; then
-    override_installed=1
-  else
-    echo "WARNING: portage rejected the targeted build override; removing it"
-    sudo rm -f "\$override_file"
-  fi
-fi
+# Note: compiling only drivers/nvme was tried here and does not work.
+# coreos-modules' src_compile was overridden (via the per-package bashrc at
+# /etc/portage/env/sys-kernel/coreos-modules) to run "kmake vmlinux" plus a
+# targeted "kmake drivers/nvme/" instead of "kmake vmlinux modules". In run
+# 34775609423 the override loaded correctly but the targeted build produced no
+# .ko files and the built-in fallback compiled all modules anyway, costing
+# ~4 minutes for nothing. kbuild's directory targets compile objects; linking
+# modules is done by the whole-tree modpost that the "modules" target runs, so
+# a subset of in-tree modules cannot be built this way. The kernel compile is
+# therefore effectively irreducible without changing the kernel config, which
+# would change the module we ship.
 
 export KBUILD_BUILD_USER="\${BUILD_USER:-build}"
 export KBUILD_BUILD_HOST="\${BUILD_HOST:-pony-truck.infra.kinvolk.io}"
@@ -206,12 +149,6 @@ else
   # Safety net: if the narrow emerge did not produce the modules, fall back to
   # the full build this script used to do.
   echo "WARNING: targeted emerge produced no NVMe modules, falling back to a full build"
-  # Remove the override first: the fallback has to run against a pristine
-  # config, or an override that broke the targeted emerge breaks it too.
-  if [ "\$override_installed" = "1" ]; then
-    echo "Removing the targeted build override before the fallback"
-    sudo rm -f "\$override_file"
-  fi
   ./build_packages --board=$BOARD
   ./build_image --board=$BOARD
   phase fallback_full_build
