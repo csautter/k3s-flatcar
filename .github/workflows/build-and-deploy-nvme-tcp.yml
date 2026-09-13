@@ -18,11 +18,20 @@ on:
         required: true
 
 concurrency:
-  group: build-and-deploy-nvme-tcp-${{ github.ref }}
+  # The version is part of the group so that the poll workflow, which dispatches
+  # one run per new upstream release in a loop, does not cancel its own runs:
+  # they all target refs/heads/main and would otherwise share a single group,
+  # leaving only the last release built. push/pull_request runs carry no version
+  # input, so they share the "-ci" group and keep cancelling stale CI runs.
+  group: build-and-deploy-nvme-tcp-${{ github.ref }}-${{ github.event.inputs.version || 'ci' }}
   cancel-in-progress: true
 
 env:
   VERSION: ${{ inputs.version || 'stable-4230.2.2' }}
+  # Real SDK build on main, and on any branch when explicitly dispatched, so a
+  # change can be validated from its PR before merging. Automatic push and
+  # pull_request runs on other refs stay cheap and use the stub module below.
+  REAL_BUILD: ${{ github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' }}
 
 jobs:
   build:
@@ -55,7 +64,7 @@ jobs:
         uses: docker/setup-buildx-action@v4
 
       - name: Run docker-nvme-tcp.sh
-        if: github.ref == 'refs/heads/main'
+        if: env.REAL_BUILD == 'true'
         run: |
           if [ "${{ matrix.board_arch }}" = "arm64" ]; then
             echo "Building for ARM64 architecture"
@@ -66,7 +75,7 @@ jobs:
           ./build/kernel/nvme/docker-nvme-tcp.sh
 
       - name: Simulate docker-nvme-tcp.sh output file
-        if: github.ref != 'refs/heads/main'
+        if: env.REAL_BUILD != 'true'
         run: |
           mkdir -p build/kernel/nvme
           echo "dummy nvme tcp module" > build/kernel/nvme/nvme-tcp.ko.xz
