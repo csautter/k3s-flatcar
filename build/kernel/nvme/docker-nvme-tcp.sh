@@ -132,21 +132,27 @@ echo "=== END PORTAGE PATHS ==="
 # nine. vmlinux is still required -- modpost resolves module symbols against
 # it -- but the module compile can be restricted to drivers/nvme.
 #
-# This overrides src_compile through /etc/portage/env, which portage sources
-# into the ebuild environment after the eclasses, so the override sees kmake
-# and setup_keys. It must be written after setup_board, which regenerates
-# /build/<board>/etc/portage.
+# The override goes in /etc/portage/env/<category>/<package>, which portage
+# sources as bash into the ebuild environment after the eclasses
+# (source_all_bashrcs), so it can call the eclass's kmake and setup_keys.
 #
-# The override is self-correcting: kbuild's support for in-tree directory
-# targets is what makes this work, and if that does not produce modules here
-# it falls back to a full "kmake modules" inside the same phase rather than
-# failing the build or costing another CI cycle. modules.order is trimmed to
-# the modules actually built, because modules_install walks it and would
-# otherwise fail on every module the targeted build skipped.
-if [ "$TARGETED_KERNEL_BUILD" = "1" ]; then
+# It must NOT go through package.env: those files are read by portage's
+# getconfig() as strict KEY=value pairs, so a function definition aborts every
+# emerge against the board with
+#   ParseError: line 1: Invalid token '(' (not '=')
+# That took out build_packages too, which is why the guard below exists.
+#
+# Written after setup_board, which regenerates /build/<board>/etc/portage.
+override_file=/build/$BOARD/etc/portage/env/sys-kernel/coreos-modules
+override_installed=0
+if [ "$TARGETED_KERNEL_BUILD" != "1" ]; then
+  echo "Targeted drivers/nvme kernel build disabled, compiling all modules"
+elif [ -e "\$override_file" ]; then
+  echo "WARNING: \$override_file already exists; not overwriting SDK config, compiling all modules"
+else
   echo "Installing targeted drivers/nvme kernel build override"
-  sudo mkdir -p /build/$BOARD/etc/portage/env
-  sudo tee /build/$BOARD/etc/portage/env/coreos-modules-nvme.conf >/dev/null <<'ENVEOF'
+  sudo mkdir -p "\$(dirname "\$override_file")"
+  sudo tee "\$override_file" >/dev/null <<'ENVEOF'
 src_compile() {
 	local t0 t1 t2 order="\${S}/build/modules.order"
 
@@ -172,16 +178,15 @@ src_compile() {
 	einfo "TIMING modules \$(( t2 - t1 ))s"
 }
 ENVEOF
-  # package.env may be a file or a directory depending on the profile.
-  pkgenv=/build/$BOARD/etc/portage/package.env
-  if [ -f "\$pkgenv" ]; then
-    echo 'sys-kernel/coreos-modules coreos-modules-nvme.conf' | sudo tee -a "\$pkgenv" >/dev/null
+  # Cheap guard: resolve the package with the override in place. A config-level
+  # rejection shows up here in seconds instead of breaking the build, and the
+  # optimisation is simply dropped rather than costing a release.
+  if emerge-$BOARD --pretend --quiet sys-kernel/coreos-modules >/dev/null 2>&1; then
+    override_installed=1
   else
-    sudo mkdir -p "\$pkgenv"
-    echo 'sys-kernel/coreos-modules coreos-modules-nvme.conf' | sudo tee "\$pkgenv/coreos-modules-nvme" >/dev/null
+    echo "WARNING: portage rejected the targeted build override; removing it"
+    sudo rm -f "\$override_file"
   fi
-else
-  echo "Targeted drivers/nvme kernel build disabled, compiling all modules"
 fi
 
 export KBUILD_BUILD_USER="\${BUILD_USER:-build}"
@@ -201,6 +206,12 @@ else
   # Safety net: if the narrow emerge did not produce the modules, fall back to
   # the full build this script used to do.
   echo "WARNING: targeted emerge produced no NVMe modules, falling back to a full build"
+  # Remove the override first: the fallback has to run against a pristine
+  # config, or an override that broke the targeted emerge breaks it too.
+  if [ "\$override_installed" = "1" ]; then
+    echo "Removing the targeted build override before the fallback"
+    sudo rm -f "\$override_file"
+  fi
   ./build_packages --board=$BOARD
   ./build_image --board=$BOARD
   phase fallback_full_build
