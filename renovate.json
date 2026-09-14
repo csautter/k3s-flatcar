@@ -32,6 +32,17 @@
     },
     {
       "customType": "regex",
+      "description": "RKE2 version pinned in the example env file, consumed by the Ignition configs",
+      "managerFilePatterns": ["^scripts/\\.env\\.example$"],
+      "matchStrings": [
+        "RKE2_VERSION=\"(?<currentValue>[^\"]+)\""
+      ],
+      "depNameTemplate": "rancher/rke2",
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "regex:^v(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)\\+rke2r(?<build>\\d+)$"
+    },
+    {
+      "customType": "regex",
       "description": "Butane Docker image used to convert Butane YAML to Ignition JSON",
       "managerFilePatterns": ["^scripts/convert-to-json-ignition\\.sh$"],
       "matchStrings": [
