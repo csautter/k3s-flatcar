@@ -24,16 +24,26 @@ TAG="${MODULE_NAME}-${ARCH}-stable-${FLATCAR_VERSION}"
 MODULE_URL="https://github.com/${REPO}/releases/download/${TAG}/${MODULE_NAME}.ko.xz"
 
 MODULE_DIR="/opt/nvme-tcp"
-MODULE_PATH="${MODULE_DIR}/${MODULE_NAME}.ko.xz"
+# Cache each download under its release tag. A fixed filename would be kept
+# across Flatcar updates, and the stale module, built for the previous kernel,
+# fails to load with a vermagic mismatch.
+MODULE_PATH="${MODULE_DIR}/${TAG}/${MODULE_NAME}.ko.xz"
 
 # Create directory for the module
-mkdir -p "${MODULE_DIR}"
+mkdir -p "$(dirname "${MODULE_PATH}")"
 
-# Download the kernel module if not present or outdated
+# Download the kernel module if not already cached for this release
 if [ ! -f "${MODULE_PATH}" ]; then
     echo "Downloading nvme-tcp kernel module for Flatcar ${FLATCAR_VERSION}-${FLATCAR_BUILD_ID}..."
-    curl -fsSL -o "${MODULE_PATH}" "${MODULE_URL}"
+    # Download to a temporary file first, so an interrupted transfer cannot be
+    # cached as a truncated module and reused on the next run.
+    curl -fsSL -o "${MODULE_PATH}.part" "${MODULE_URL}"
+    mv -f "${MODULE_PATH}.part" "${MODULE_PATH}"
 fi
+
+# Drop caches left over from previous Flatcar releases, including the module
+# that older versions of this script cached directly as ${MODULE_DIR}/*.ko.xz
+find "${MODULE_DIR}" -mindepth 1 -maxdepth 1 ! -name "${TAG}" -exec rm -rf {} +
 
 # Install the module to /lib/modules/$(uname -r)/extra
 INSTALL_DIR="/usr/lib/modules/$(uname -r)/extra"
