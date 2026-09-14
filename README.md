@@ -292,6 +292,11 @@ The installer detects the architecture and the running Flatcar version, download
 `/usr/lib/modules/$(uname -r)/extra`, runs `depmod`, loads it, and writes
 `/etc/modules-load.d/nvme-tcp.conf` so it is loaded on boot.
 
+The download is cached under `/opt/nvme-tcp/<release-tag>/`. Because the cache is keyed by
+Flatcar release, the service picks up a matching module automatically after an OS update
+instead of reusing one built for the previous kernel; caches for older releases are pruned on
+each run.
+
 ### 3. Verify
 
 ```sh
@@ -350,20 +355,11 @@ Dependency updates are automated:
 
 ## Known Limitations
 
-- `server-1-ignite-boot.yaml` does not set `INSTALL_K3S_VERSION`, so the first node installs
-  whatever `get.k3s.io` currently serves as latest, while servers 2/3 and the agents pin
-  `K3S_VERSION`. This can cause a version skew. Add
-  `Environment="INSTALL_K3S_VERSION=${K3S_VERSION}"` to the template if you want the first
-  node pinned too.
 - The hostname in `server-1-ignite-boot.yaml` is `node-1`, not `server-1`.
 - `server-2-install.sh` is hardcoded to `server-2-ignite-boot.json` and `/dev/sda`. There is no
   equivalent wrapper for the other nodes — call `flatcar-install` directly as shown above.
 - The install script for the NVMe-TCP module hardcodes the `stable` Flatcar channel, so
   `lts-*` releases are not covered.
-- The NVMe-TCP installer caches its download at a fixed path (`/opt/nvme-tcp/nvme-tcp.ko.xz`)
-  and skips the download if that file already exists. After a Flatcar update the cached module
-  no longer matches the new kernel, and `modprobe` fails with a vermagic mismatch. Delete
-  `/opt/nvme-tcp/nvme-tcp.ko.xz` and re-run the installer after an OS update.
 
 ---
 
@@ -379,7 +375,10 @@ Dependency updates are automated:
     That is expected on reboots.
 - **Kernel module not loading?**
   - Check `dmesg` and `lsmod | grep nvme` for errors.
-  - Ensure the kernel version matches the module version.
+  - `modprobe: ERROR: could not insert 'nvme_tcp': Exec format error` together with an
+    `version magic ... should be ...` line in `dmesg` means the module does not match the
+    running kernel. Check that a release exists for your Flatcar version — the installer only
+    covers the `stable` channel — then clear `/opt/nvme-tcp` and re-run the installer.
 - **Systemd service not starting?**
   - Run `systemctl status install-nvme-tcp-kernel-module.service` for logs.
 - **ISO not booting?**
