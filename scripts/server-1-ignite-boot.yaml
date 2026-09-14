@@ -22,6 +22,7 @@ systemd:
         KillMode=process
         Environment="K3S_TOKEN=${K3S_TOKEN}"
         Environment="INSTALL_K3S_EXEC=--cluster-init"
+        Environment="INSTALL_K3S_VERSION=${K3S_VERSION}"
         ExecStart=/usr/bin/sh -c "/opt/k3s-install.sh"
         [Install]
         WantedBy=multi-user.target
