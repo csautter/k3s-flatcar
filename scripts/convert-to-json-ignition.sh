@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 set -x
 
 # load env variables from .env file
@@ -6,14 +7,12 @@ set -a
 source .env
 env
 
-# generate ignition config files for n servers
+# generate ignition config files for every node
 # using the template files and the environment variables
 
-envsubst < server-1-ignite-boot.yaml > server-1-ignite-boot.yaml.tmp
-envsubst < server-2-ignite-boot.yaml > server-2-ignite-boot.yaml.tmp
-
-docker run --rm -i quay.io/coreos/butane:v0.29.0 < server-1-ignite-boot.yaml.tmp > server-1-ignite-boot.json
-docker run --rm -i quay.io/coreos/butane:v0.29.0 < server-2-ignite-boot.yaml.tmp > server-2-ignite-boot.json
-
-rm server-1-ignite-boot.yaml.tmp
-rm server-2-ignite-boot.yaml.tmp
+for template in *-ignite-boot.yaml; do
+    base="${template%.yaml}"
+    envsubst < "$template" > "$base.yaml.tmp"
+    docker run --rm -i quay.io/coreos/butane:v0.29.0 < "$base.yaml.tmp" > "$base.json"
+    rm "$base.yaml.tmp"
+done
