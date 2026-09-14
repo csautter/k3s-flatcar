@@ -1,6 +1,7 @@
 **/.env
 **/!.env.example
 scripts/*.json
+scripts/**/*.json
 **/*.tmp
 **/*.iso
 .idea
