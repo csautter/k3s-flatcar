@@ -23,9 +23,26 @@ cat <<EOF | docker run -i --privileged -v /dev:/dev -v ./deployments/kernel/nvme
 set -x
 echo "Building $ARCH (board $BOARD) for Flatcar $VERSION"
 
+# Phase timing. The build is long and its cost is not evenly spread, so record
+# where the time actually goes; "PHASE TIMINGS" at the end is the summary to
+# read when deciding what is worth caching or narrowing further.
+phase_log=/tmp/phase-timings
+: > "\$phase_log"
+phase_start=\$(date +%s)
+phase() {
+  local now elapsed
+  now=\$(date +%s)
+  elapsed=\$(( now - phase_start ))
+  printf '%-28s %5dm %02ds\\n' "\$1" "\$(( elapsed / 60 ))" "\$(( elapsed % 60 ))" >> "\$phase_log"
+  echo "=== PHASE \$1 took \$(( elapsed / 60 ))m \$(( elapsed % 60 ))s ==="
+  phase_start=\$now
+}
+trap 'echo "=== PHASE TIMINGS (partial, build did not finish) ==="; cat "\$phase_log"' EXIT
+
 cd ~/trunk/src/scripts
 yes "" | ../sdk_init_selfcontained.sh
 git checkout $VERSION
+phase sdk_init+checkout
 echo "CONFIG_NVME_TARGET_TCP=m" >> ~/trunk/src/third_party/coreos-overlay/sys-kernel/coreos-modules/files/commonconfig-*
 echo "CONFIG_NVME_TCP=m" >> ~/trunk/src/third_party/coreos-overlay/sys-kernel/coreos-modules/files/commonconfig-*
 
@@ -84,6 +101,37 @@ nvme_module_dir() {
 # would have used, so the board root and the resulting module are configured
 # exactly as before; only the set of emerged packages is narrowed.
 ./setup_board --board=$BOARD --regen_configs --usepkg --nousepkgonly --getbinpkg
+phase setup_board
+
+# Report the SDK's real portage locations and their sizes. Caching these
+# between runs is the next optimisation, and it needs the paths the SDK
+# actually uses rather than guessed ones.
+echo "=== PORTAGE PATHS ==="
+# Query one at a time: portageq exits non-zero for the whole call if any single
+# name is unset, which would hide the ones that are set.
+for v in DISTDIR PKGDIR PORTAGE_TMPDIR CCACHE_DIR CCACHE_SIZE FEATURES; do
+  echo "\$v=\$(portageq-$BOARD envvar "\$v" 2>/dev/null || echo '<unset>')"
+done
+for v in DISTDIR PKGDIR; do
+  d=\$(portageq-$BOARD envvar "\$v" 2>/dev/null) || continue
+  [ -n "\$d" ] && sudo du -sh "\$d" 2>/dev/null || true
+done
+sudo du -sh /build/$BOARD 2>/dev/null || true
+df -h /build /var/tmp 2>/dev/null || true
+echo "=== END PORTAGE PATHS ==="
+
+# Note: compiling only drivers/nvme was tried here and does not work.
+# coreos-modules' src_compile was overridden (via the per-package bashrc at
+# /etc/portage/env/sys-kernel/coreos-modules) to run "kmake vmlinux" plus a
+# targeted "kmake drivers/nvme/" instead of "kmake vmlinux modules". In run
+# 34775609423 the override loaded correctly but the targeted build produced no
+# .ko files and the built-in fallback compiled all modules anyway, costing
+# ~4 minutes for nothing. kbuild's directory targets compile objects; linking
+# modules is done by the whole-tree modpost that the "modules" target runs, so
+# a subset of in-tree modules cannot be built this way. The kernel compile is
+# therefore effectively irreducible without changing the kernel config, which
+# would change the module we ship.
+
 export KBUILD_BUILD_USER="\${BUILD_USER:-build}"
 export KBUILD_BUILD_HOST="\${BUILD_HOST:-pony-truck.infra.kinvolk.io}"
 
@@ -93,6 +141,7 @@ emerge-$BOARD --update --deep --newuse --verbose --backtrack=30 --select \
   --jobs="\$(nproc)" --usepkg --getbinpkg --with-bdeps y \
   --usepkg-exclude=sys-kernel/coreos-modules \
   sys-kernel/coreos-modules
+phase emerge_coreos-modules
 
 if nvme_module_dir > /dev/null; then
   echo "NVMe modules built by the targeted coreos-modules emerge"
@@ -102,6 +151,7 @@ else
   echo "WARNING: targeted emerge produced no NVMe modules, falling back to a full build"
   ./build_packages --board=$BOARD
   ./build_image --board=$BOARD
+  phase fallback_full_build
 fi
 
 sudo find /build/$BOARD/ -name "*nvme*ko*"
@@ -110,9 +160,37 @@ src=\$(nvme_module_dir) || {
   echo "ERROR: no nvme-tcp module under /build/$BOARD/usr/lib/modules/*-flatcar/kernel/drivers/nvme/"
   exit 1
 }
+# A module that exists but will not load would pass the presence check above,
+# so confirm it was built for this kernel and list the module set. The signer
+# is reported, not required: commonconfig sets CONFIG_MODULE_SIG=y without
+# CONFIG_MODULE_SIG_ALL, so modules_install does not sign them and this line
+# reads "no signer reported" on a correct build.
+kver=\${src#*/usr/lib/modules/}
+kver=\${kver%%/*}
+mod=\$(sudo find "\$src" -name 'nvme-tcp.ko*' -print -quit)
+echo "=== MODULE CHECK (kernel \$kver) ==="
+if vermagic=\$(sudo modinfo -F vermagic "\$mod" 2>/dev/null) && [ -n "\$vermagic" ]; then
+  echo "vermagic: \$vermagic"
+  case "\$vermagic" in
+    "\$kver"*) echo "vermagic matches \$kver" ;;
+    *) echo "ERROR: vermagic '\$vermagic' does not match kernel \$kver"; exit 1 ;;
+  esac
+  signer=\$(sudo modinfo -F signer "\$mod" 2>/dev/null || true)
+  if [ -n "\$signer" ]; then echo "signed by: \$signer"; else echo "WARNING: no signer reported"; fi
+else
+  echo "WARNING: modinfo could not read \$mod; skipping vermagic check"
+fi
+sudo find "\$src" -name '*.ko*' | sed 's#.*/##' | sort
+echo "=== END MODULE CHECK ==="
+
 echo "Copying NVMe modules from \$src"
 sudo mkdir -p /opt/kernel-modules/$ARCH
 sudo cp -r "\$src" /opt/kernel-modules/$ARCH/
+phase collect_modules
+
+trap - EXIT
+echo "=== PHASE TIMINGS ==="
+cat "\$phase_log"
 EOF
 container_id=$(docker ps -l -q)
 echo "Container ID: $container_id"
