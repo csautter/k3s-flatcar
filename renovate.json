@@ -44,7 +44,10 @@
     {
       "customType": "regex",
       "description": "Butane Docker image used to convert Butane YAML to Ignition JSON",
-      "managerFilePatterns": ["^scripts/convert-to-json-ignition\\.sh$"],
+      "managerFilePatterns": [
+        "^scripts/convert-to-json-ignition\\.sh$",
+        "^\\.github/workflows/test-config-generation\\.yml$"
+      ],
       "matchStrings": [
         "quay\\.io/coreos/butane:(?<currentValue>[^\\s]+)"
       ],

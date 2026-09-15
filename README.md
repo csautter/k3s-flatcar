@@ -29,6 +29,7 @@ config ISO for VM or bare metal installation.
 - [NVMe-TCP Kernel Module](#nvme-tcp-kernel-module)
 - [Building Kernel Modules](#building-kernel-modules)
 - [Automated Workflows](#automated-workflows)
+- [Tests](#tests)
 - [Security Notes](#security-notes)
 - [Known Limitations](#known-limitations)
 - [Troubleshooting](#troubleshooting)
@@ -490,12 +491,39 @@ GitHub Actions are used to automate building and deploying the NVMe-TCP kernel m
 
 - [`build-and-deploy-nvme-tcp.yml`](.github/workflows/build-and-deploy-nvme-tcp.yml): Builds the module and creates a release.
 - [`poll-flatcar-scripts-tags.yml`](.github/workflows/poll-flatcar-scripts-tags.yml): Polls the Flatcar scripts repository for new releases and triggers builds.
+- [`test-config-generation.yml`](.github/workflows/test-config-generation.yml): Runs the config generation tests on every change to `scripts/` or `tests/`.
 - [`renovate.yml`](.github/workflows/renovate.yml): Runs [Renovate](https://docs.renovatebot.com/) on a weekly schedule to keep the Flatcar SDK version, the k3s and RKE2 versions, and the Butane image tag up to date via pull requests.
 
 Dependency updates are automated:
 
 - **[Dependabot](.github/dependabot.yml)** keeps the GitHub Actions used in these workflows up to date.
 - **[Renovate](renovate.json)** tracks the Flatcar SDK/scripts version, the k3s and RKE2 versions, and the Butane Docker image tag, which aren't covered by Dependabot's built-in ecosystems.
+
+---
+
+## Tests
+
+[`tests/test-config-generation.sh`](tests/test-config-generation.sh) runs the real
+generation scripts against a fixture `.env` inside a throwaway copy of `scripts/`, so your
+own `.env` and generated files are never touched. It covers both distributions end to end:
+templates render without Butane warnings, the installer scripts are actually downloaded,
+the cluster token and register ports land where they should, the systemd units enable and
+start the right service, and the config ISO carries that distribution's configs at the ISO
+root.
+
+```sh
+tests/test-config-generation.sh
+```
+
+Requires `docker`, `envsubst`, `mkisofs` (or `genisoimage`), `isoinfo` and `python3`. It
+exits non-zero on the first failing assertion set and prints a pass/fail summary.
+
+The suite is run in CI by
+[`test-config-generation.yml`](.github/workflows/test-config-generation.yml) on every push
+and pull request that touches `scripts/` or `tests/`.
+
+It does **not** boot a node. Whether a config actually brings up a cluster can only be
+confirmed by installing one, as described above.
 
 ---
 
