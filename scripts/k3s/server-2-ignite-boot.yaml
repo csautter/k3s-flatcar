@@ -36,13 +36,10 @@ passwd:
 storage:
   files:
     - path: /etc/hostname
-      filesystem: root
       mode: 0644
       contents:
         inline: server-2
     - path: /opt/k3s-install.sh
-      filesystem: root
       mode: 0755
       contents:
-        remote:
-          url: https://get.k3s.io
+        source: https://get.k3s.io

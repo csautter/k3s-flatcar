@@ -1,5 +1,6 @@
-# This ignition config is for the first K3s server node in an k8s cluster.
-# It will install K3s and configure it to be the first server in the cluster.
+# This Ignition config is for an additional K3s server node in an k8s cluster.
+# It will install K3s and configure it to join the existing cluster.
+# adapt the IP address of the server node to your needs
 # adapt the token to your needs
 # adapt the ssh key to your needs
 variant: flatcar
@@ -21,7 +22,7 @@ systemd:
         RemainAfterExit=yes
         KillMode=process
         Environment="K3S_TOKEN=${K3S_TOKEN}"
-        Environment="INSTALL_K3S_EXEC=--cluster-init"
+        Environment="INSTALL_K3S_EXEC='server' '--server' '${SERVER_REGISTER_URL}'"
         Environment="INSTALL_K3S_VERSION=${K3S_VERSION}"
         ExecStart=/usr/bin/sh -c "/opt/k3s-install.sh"
         [Install]
@@ -35,13 +36,10 @@ passwd:
 storage:
   files:
     - path: /etc/hostname
-      filesystem: root
       mode: 0644
       contents:
-        inline: node-1
+        inline: server-3
     - path: /opt/k3s-install.sh
-      filesystem: root
       mode: 0755
       contents:
-        remote:
-          url: https://get.k3s.io
+        source: https://get.k3s.io

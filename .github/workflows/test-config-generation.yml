@@ -1,0 +1,44 @@
+name: Test Config Generation
+
+on:
+  push:
+    branches: [main, feat/*]
+    paths:
+      - "scripts/**"
+      - "tests/**"
+      - ".github/workflows/test-config-generation.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "scripts/**"
+      - "tests/**"
+      - ".github/workflows/test-config-generation.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: test-config-generation-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Install ISO and template tooling
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends genisoimage gettext-base
+
+      # The tests run the real scripts, which convert Butane via the pinned
+      # container image. Pulling it up front keeps the failure legible if the
+      # registry is unreachable.
+      - name: Pull the pinned Butane image
+        run: docker pull quay.io/coreos/butane:v0.29.0
+
+      - name: Run config generation tests
+        run: tests/test-config-generation.sh

@@ -1,0 +1,63 @@
+# This Ignition config is for an additional RKE2 server node in an k8s cluster.
+# It will install RKE2 and configure it to join the existing cluster.
+# adapt the IP address of the server node to your needs, note it registers on port 9345
+# adapt the token to your needs
+# adapt the ssh key to your needs
+variant: flatcar
+version: 1.0.0
+systemd:
+  units:
+    - name: rke2-install.service
+      enabled: true
+      contents: |
+        [Unit]
+        Description=Run RKE2 install script
+        Wants = network-online.target
+        After = network.target network-online.target
+        ConditionPathExists=/opt/rke2-install.sh
+        ConditionPathExists=!/opt/rke2/bin/rke2
+        [Service]
+        Type=oneshot
+        TimeoutStartSec=300
+        RemainAfterExit=yes
+        Environment="INSTALL_RKE2_METHOD=tar"
+        Environment="INSTALL_RKE2_TAR_PREFIX=/opt/rke2"
+        Environment="INSTALL_RKE2_TYPE=server"
+        Environment="INSTALL_RKE2_VERSION=${RKE2_VERSION}"
+        ExecStart=/usr/bin/sh -c "/opt/rke2-install.sh"
+        # The RKE2 installer only unpacks the tarball, it never starts the unit.
+        # --no-block keeps this oneshot from deadlocking on the service it starts.
+        ExecStartPost=/usr/bin/systemctl enable rke2-server.service
+        ExecStartPost=/usr/bin/systemctl start --no-block rke2-server.service
+        [Install]
+        WantedBy=multi-user.target
+passwd:
+  users:
+    - name: core
+      ssh_authorized_keys:
+        - ${SSH_PUB_KEY_1}
+        - ${SSH_PUB_KEY_2}
+storage:
+  files:
+    - path: /etc/hostname
+      mode: 0644
+      contents:
+        inline: rke2-server-3
+    - path: /etc/rancher/rke2/config.yaml
+      mode: 0600
+      contents:
+        inline: |
+          token: ${RKE2_TOKEN}
+          server: ${RKE2_SERVER_REGISTER_URL}
+          write-kubeconfig-mode: "0600"
+          secrets-encryption: true
+    - path: /opt/rke2-install.sh
+      mode: 0755
+      contents:
+        source: https://get.rke2.io
+    - path: /etc/profile.d/rke2.sh
+      mode: 0644
+      contents:
+        inline: |
+          export PATH="/opt/rke2/bin:/var/lib/rancher/rke2/bin:$PATH"
+          export KUBECONFIG=/etc/rancher/rke2/rke2.yaml
