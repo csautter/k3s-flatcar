@@ -92,7 +92,7 @@ jobs:
           echo "nvme_path=$NVME_PATH" >> $GITHUB_OUTPUT
 
       - name: Upload nvme-tcp.ko.xz as artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: nvme-tcp-ko-xz-${{ matrix.board_arch }}
           path: ${{ steps.find_nvme.outputs.nvme_path }}
